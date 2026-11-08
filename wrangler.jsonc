@@ -7,7 +7,10 @@
     "compatibility_flags": [
         "nodejs_compat"
     ],
-    "vars": {},
+    "vars": {
+        "AWS_REGION": "ap-southeast-1",
+        "AWS_S3_BUCKET": "psb-documents"
+    },
     "assets": {
         "directory": ".open-next/assets",
         "binding": "ASSETS"

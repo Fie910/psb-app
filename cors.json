@@ -1,0 +1,23 @@
+{
+    "CORSRules": [
+        {
+            "AllowedOrigins": [
+                "http://localhost:3000",
+                "https://psb.smk-khawm.workers.dev",
+                "https://pmb.smk-khawahabmuhsin.sch.id"
+            ],
+            "AllowedMethods": [
+                "PUT",
+                "GET",
+                "HEAD"
+            ],
+            "AllowedHeaders": [
+                "*"
+            ],
+            "ExposeHeaders": [
+                "ETag"
+            ],
+            "MaxAgeSeconds": 3000
+        }
+    ]
+}
