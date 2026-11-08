@@ -1,12 +1,13 @@
 {
     "$schema": "./node_modules/wrangler/config-schema.json",
-    "name": "psb-app",
+    "name": "psb",
     "main": ".open-next/worker.js",
     "upload_source_maps": true,
     "compatibility_date": "2026-11-08",
     "compatibility_flags": [
         "nodejs_compat"
     ],
+    "vars": {},
     "assets": {
         "directory": ".open-next/assets",
         "binding": "ASSETS"
