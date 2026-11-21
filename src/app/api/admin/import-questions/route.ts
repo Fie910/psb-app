@@ -1,7 +1,12 @@
+//src/app/api/admin/import-questions/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
+import { requireAdminAuth } from '@/lib/auth/server';
 
 export async function POST(request: NextRequest) {
+    const authCheck = await requireAdminAuth();
+    if (!authCheck.authorized) return authCheck.response;
+
     try {
         const sql = getDb();
         const { category, jsonData } = await request.json();
@@ -63,6 +68,7 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json({ message: 'Berhasil', count: questionsToInsert.length }, { status: 200 });
     } catch (error) {
+        console.error('Error import questions:', error);
         return NextResponse.json({ error: 'Gagal import' }, { status: 500 });
     }
 }

@@ -1,10 +1,15 @@
+//src/app/api/admin/applicants/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
+import { requireAdminAuth } from '@/lib/auth/server';
 
 export async function GET(
     request: NextRequest,
     context: { params: Promise<{ id: string }> }
 ) {
+    const authCheck = await requireAdminAuth();
+    if (!authCheck.authorized) return authCheck.response;
+
     try {
         const { id } = await context.params;
         const applicantId = parseInt(id);
@@ -43,4 +48,3 @@ export async function GET(
         return NextResponse.json({ error: 'Gagal mengambil data peserta' }, { status: 500 });
     }
 }
-

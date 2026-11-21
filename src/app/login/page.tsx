@@ -1,3 +1,4 @@
+//src/app/login/page.tsx
 'use client';
 
 import { useState } from 'react';
@@ -100,9 +101,8 @@ export default function LoginPage() {
                             <label className={`block text-sm font-semibold ${labelCls}`}>Password</label>
                             <a
                                 href="/forgot-password"
-                                className={`text-xs font-semibold transition-colors hover:underline ${
-                                    isDarkMode ? 'text-teal-400 hover:text-teal-300' : 'text-[#b85c38] hover:text-[#a04d2c]'
-                                }`}
+                                className={`text-xs font-semibold transition-colors hover:underline ${isDarkMode ? 'text-teal-400 hover:text-teal-300' : 'text-[#b85c38] hover:text-[#a04d2c]'
+                                    }`}
                             >
                                 Lupa password?
                             </a>

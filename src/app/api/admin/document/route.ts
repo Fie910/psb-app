@@ -1,7 +1,12 @@
+//src/app/api/admin/document/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { AwsClient } from 'aws4fetch';
+import { requireAdminAuth } from '@/lib/auth/server';
 
 export async function POST(request: NextRequest) {
+    const authCheck = await requireAdminAuth();
+    if (!authCheck.authorized) return authCheck.response;
+
     try {
         const { key } = await request.json();
         if (!key) return NextResponse.json({ error: 'Key diperlukan' }, { status: 400 });
@@ -13,7 +18,6 @@ export async function POST(request: NextRequest) {
             region: process.env.AWS_REGION!,
         });
 
-        // Buat URL GET (bukan PUT) dengan masa berlaku 1 jam (3600 detik)
         const url = new URL(`${process.env.AWS_ENDPOINT_URL_S3}/${process.env.AWS_S3_BUCKET}/${key}`);
         url.searchParams.set('X-Amz-Expires', '3600');
 

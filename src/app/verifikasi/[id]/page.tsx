@@ -1,3 +1,4 @@
+//src/app/verifikasi/[id]/page.tsx
 'use client';
 import { use, useEffect, useState } from 'react';
 

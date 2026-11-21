@@ -1,3 +1,4 @@
+//src/app/api/check-email/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 

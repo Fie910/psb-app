@@ -1,7 +1,12 @@
+//src/app/api/admin/applicants/route.ts
 import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
+import { requireAdminAuth } from '@/lib/auth/server';
 
 export async function GET() {
+  const authCheck = await requireAdminAuth();
+  if (!authCheck.authorized) return authCheck.response;
+
   try {
     const sql = getDb();
     const applicants = await sql`

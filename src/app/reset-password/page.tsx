@@ -1,3 +1,4 @@
+//src/app/reset-password/page.tsx
 'use client';
 
 import { useState, Suspense } from 'react';
@@ -92,9 +93,8 @@ function ResetPasswordForm() {
             <div className={`w-full max-w-sm p-8 rounded-3xl border z-10 ${card}`}>
                 {/* Icon Header */}
                 <div className="flex justify-center mb-5">
-                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg ${
-                        isDarkMode ? 'bg-teal-600/30 border border-teal-500/40' : 'bg-[#b85c38]/15 border border-[#b85c38]/30'
-                    }`}>
+                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg ${isDarkMode ? 'bg-teal-600/30 border border-teal-500/40' : 'bg-[#b85c38]/15 border border-[#b85c38]/30'
+                        }`}>
                         <Lock className={`w-8 h-8 ${isDarkMode ? 'text-teal-400' : 'text-[#b85c38]'}`} />
                     </div>
                 </div>
@@ -107,9 +107,8 @@ function ResetPasswordForm() {
                 </p>
 
                 {error && (
-                    <div className={`flex items-start gap-2 text-sm font-medium mb-4 p-3 rounded-xl ${
-                        isDarkMode ? 'bg-red-900/40 text-red-300 border border-red-700/50' : 'bg-red-100/60 text-red-700 border border-red-200'
-                    }`}>
+                    <div className={`flex items-start gap-2 text-sm font-medium mb-4 p-3 rounded-xl ${isDarkMode ? 'bg-red-900/40 text-red-300 border border-red-700/50' : 'bg-red-100/60 text-red-700 border border-red-200'
+                        }`}>
                         <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                         <span>{error}</span>
                     </div>
@@ -117,9 +116,8 @@ function ResetPasswordForm() {
 
                 {isSuccess ? (
                     <div className="space-y-4">
-                        <div className={`p-4 rounded-xl border flex flex-col items-center text-center ${
-                            isDarkMode ? 'bg-green-900/30 border-green-700/50 text-green-300' : 'bg-green-50 border-green-200 text-green-800'
-                        }`}>
+                        <div className={`p-4 rounded-xl border flex flex-col items-center text-center ${isDarkMode ? 'bg-green-900/30 border-green-700/50 text-green-300' : 'bg-green-50 border-green-200 text-green-800'
+                            }`}>
                             <CheckCircle2 className="w-8 h-8 mb-2 text-green-500" />
                             <p className="font-semibold text-sm mb-1">Password Berhasil Diperbarui!</p>
                             <p className="text-xs opacity-90 leading-relaxed">
@@ -130,11 +128,10 @@ function ResetPasswordForm() {
                         <div className="pt-2">
                             <button
                                 onClick={() => router.push('/login')}
-                                className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all hover:-translate-y-0.5 ${
-                                    isDarkMode
+                                className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all hover:-translate-y-0.5 ${isDarkMode
                                         ? 'bg-teal-600 hover:bg-teal-500 text-white shadow-lg shadow-teal-900/40'
                                         : 'bg-[#b85c38] hover:bg-[#a04d2c] text-white shadow-lg shadow-[#b85c38]/25'
-                                }`}
+                                    }`}
                             >
                                 Masuk Sekarang
                             </button>
@@ -157,9 +154,8 @@ function ResetPasswordForm() {
                                 <button
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
-                                    className={`absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-lg transition-colors ${
-                                        isDarkMode ? 'text-gray-400 hover:text-teal-400' : 'text-[#9e8369] hover:text-[#b85c38]'
-                                    }`}
+                                    className={`absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-lg transition-colors ${isDarkMode ? 'text-gray-400 hover:text-teal-400' : 'text-[#9e8369] hover:text-[#b85c38]'
+                                        }`}
                                     aria-label="Toggle password visibility"
                                 >
                                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -183,11 +179,10 @@ function ResetPasswordForm() {
                         <button
                             type="submit"
                             disabled={isLoading || !token}
-                            className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all disabled:opacity-50 hover:-translate-y-0.5 mt-2 ${
-                                isDarkMode
+                            className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all disabled:opacity-50 hover:-translate-y-0.5 mt-2 ${isDarkMode
                                     ? 'bg-teal-600 hover:bg-teal-500 text-white shadow-lg shadow-teal-900/40'
                                     : 'bg-[#b85c38] hover:bg-[#a04d2c] text-white shadow-lg shadow-[#b85c38]/25'
-                            }`}
+                                }`}
                         >
                             <Lock className="w-4 h-4" />
                             {isLoading ? 'Menyimpan...' : 'Perbarui Password'}
@@ -198,9 +193,8 @@ function ResetPasswordForm() {
                 <div className="mt-6 text-center">
                     <Link
                         href="/login"
-                        className={`inline-flex items-center gap-1.5 text-xs font-semibold transition-colors hover:underline ${
-                            isDarkMode ? 'text-gray-400 hover:text-gray-200' : 'text-[#9e8369] hover:text-[#4a342a]'
-                        }`}
+                        className={`inline-flex items-center gap-1.5 text-xs font-semibold transition-colors hover:underline ${isDarkMode ? 'text-gray-400 hover:text-gray-200' : 'text-[#9e8369] hover:text-[#4a342a]'
+                            }`}
                     >
                         <ArrowLeft className="w-3.5 h-3.5" />
                         Kembali ke Login

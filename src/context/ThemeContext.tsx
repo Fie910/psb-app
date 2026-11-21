@@ -1,3 +1,4 @@
+//src/context/ThemeContext.tsx
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
@@ -10,8 +11,8 @@ type ThemeContextType = {
 
 const ThemeContext = createContext<ThemeContextType>({
     isDarkMode: false,
-    toggleTheme: () => {},
-    setTheme: () => {},
+    toggleTheme: () => { },
+    setTheme: () => { },
 });
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {

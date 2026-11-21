@@ -1,3 +1,4 @@
+//src/app/api/verifikasi/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 

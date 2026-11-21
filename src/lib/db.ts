@@ -1,3 +1,4 @@
+//src/lib/db.ts
 import { neon } from '@neondatabase/serverless';
 
 // Fungsi ini akan membuat koneksi baru setiap kali dipanggil.

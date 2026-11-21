@@ -1,3 +1,4 @@
+//src/app/wawancara/page.tsx
 'use client';
 
 import { useState } from 'react';
@@ -103,7 +104,7 @@ export default function WawancaraPage() {
     }
 
     return (
-        <main className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-[#8c7a75] via-[#b48c6c] to-[#c99e76]">
+        <main className="min-h-screen flex items-center justify-center p-4 bg-linear-to-br from-[#8c7a75] via-[#b48c6c] to-[#c99e76]">
             <div className="w-full max-w-md p-8 rounded-3xl shadow-2xl bg-[#fffcf8]/90 backdrop-blur-xl">
                 <h1 className="text-2xl font-bold text-center mb-2 text-[#2b1d18]">Masuk Ruang Wawancara</h1>
                 <p className="text-center text-sm font-semibold mb-6 text-[#8f472a]">SMK KH. A. WAHAB MUHSIN</p>

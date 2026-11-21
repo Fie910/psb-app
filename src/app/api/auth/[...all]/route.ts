@@ -1,3 +1,4 @@
+//src/app/api/auth/[...all]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 
 async function proxyRequest(request: NextRequest, method: string) {

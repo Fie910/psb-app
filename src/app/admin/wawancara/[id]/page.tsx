@@ -1,3 +1,4 @@
+//src/app/admin/wawancara/[id]/page.tsx
 'use client';
 
 import { useState, useEffect, use } from 'react';
@@ -272,22 +273,20 @@ export default function AdminWawancaraRoomPage({ params }: { params: Promise<{ i
                         <div className="flex gap-2">
                             <button
                                 onClick={() => setActiveTab('rubrik')}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                                    activeTab === 'rubrik'
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'rubrik'
                                         ? 'bg-teal-600 text-white shadow-md'
                                         : 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700'
-                                }`}
+                                    }`}
                             >
                                 <ClipboardList className="w-3.5 h-3.5" />
                                 Rubrik ({rubric.length})
                             </button>
                             <button
                                 onClick={() => setActiveTab('info')}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                                    activeTab === 'info'
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'info'
                                         ? 'bg-teal-600 text-white shadow-md'
                                         : 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700'
-                                }`}
+                                    }`}
                             >
                                 <User className="w-3.5 h-3.5" />
                                 Info Peserta
@@ -344,11 +343,10 @@ export default function AdminWawancaraRoomPage({ params }: { params: Promise<{ i
                                 return (
                                     <div
                                         key={q.id}
-                                        className={`p-4 rounded-2xl border transition-all ${
-                                            selectedScore
+                                        className={`p-4 rounded-2xl border transition-all ${selectedScore
                                                 ? 'bg-gray-900/90 border-teal-600/50 shadow-sm shadow-teal-900/20'
                                                 : 'bg-gray-900/40 border-gray-800 hover:border-gray-700'
-                                        }`}
+                                            }`}
                                     >
                                         {/* Kategori / Dimensi */}
                                         <div className="flex items-center justify-between mb-2">
@@ -396,18 +394,16 @@ export default function AdminWawancaraRoomPage({ params }: { params: Promise<{ i
                                                     <div
                                                         key={level}
                                                         onClick={() => handleSelectScore(q.id, level)}
-                                                        className={`p-2.5 rounded-xl border cursor-pointer transition-all flex items-start gap-2.5 ${
-                                                            isSelected
+                                                        className={`p-2.5 rounded-xl border cursor-pointer transition-all flex items-start gap-2.5 ${isSelected
                                                                 ? 'bg-teal-950/70 border-teal-500 text-white shadow-md shadow-teal-950/40'
                                                                 : 'bg-gray-950/40 border-gray-800/80 hover:bg-gray-800/50 text-gray-300'
-                                                        }`}
+                                                            }`}
                                                     >
                                                         <div
-                                                            className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-0.5 border ${
-                                                                isSelected
+                                                            className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-0.5 border ${isSelected
                                                                     ? 'bg-teal-500 border-teal-400 text-white'
                                                                     : 'border-gray-600 text-gray-400'
-                                                            }`}
+                                                                }`}
                                                         >
                                                             {level}
                                                         </div>
