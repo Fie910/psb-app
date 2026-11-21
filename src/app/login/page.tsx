@@ -96,7 +96,17 @@ export default function LoginPage() {
                         />
                     </div>
                     <div>
-                        <label className={`block text-sm font-semibold mb-1.5 ${labelCls}`}>Password</label>
+                        <div className="flex items-center justify-between mb-1.5">
+                            <label className={`block text-sm font-semibold ${labelCls}`}>Password</label>
+                            <a
+                                href="/forgot-password"
+                                className={`text-xs font-semibold transition-colors hover:underline ${
+                                    isDarkMode ? 'text-teal-400 hover:text-teal-300' : 'text-[#b85c38] hover:text-[#a04d2c]'
+                                }`}
+                            >
+                                Lupa password?
+                            </a>
+                        </div>
                         <div className="relative">
                             <input
                                 type={showPassword ? 'text' : 'password'}
