@@ -9,7 +9,7 @@ import { useTheme } from '@/context/ThemeContext';
 import ThemeToggle from '@/components/ThemeToggle';
 import {
     FileSpreadsheet,
-    UserPlus,
+    UserPlus, User,
     Settings,
     FileText,
     Calendar,
@@ -350,6 +350,17 @@ export default function AdminDashboard() {
                         >
                             <UserPlus className="w-4 h-4 text-indigo-500" />
                             <span>+ Panitia</span>
+                        </Link>
+
+                        <Link
+                            href="/admin/akun"
+                            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold border transition-all duration-200 shadow-sm active:scale-95 ${isDarkMode
+                                ? 'bg-gray-800/80 hover:bg-gray-700 border-gray-700 text-gray-200'
+                                : 'bg-white/80 hover:bg-white border-[#d6c5b3] text-[#4a342a]'
+                                }`}
+                        >
+                            <User className="w-4 h-4 text-gray-500" />
+                            <span>Akun</span>
                         </Link>
 
                         <Link
