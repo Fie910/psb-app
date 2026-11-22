@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useTheme } from '@/context/ThemeContext';
 import ThemeToggle from '@/components/ThemeToggle';
-import { CheckCircle2, XCircle, Circle, Check, MessageCircle, ArrowRight } from 'lucide-react';
+import { CheckCircle2, XCircle, Circle, Check, MessageCircle, ArrowRight, UserCheck } from 'lucide-react';
 
 export default function LandingPage() {
     const { isDarkMode } = useTheme();
@@ -117,6 +117,17 @@ export default function LandingPage() {
                             </button>
                         )}
 
+                        <Link
+                            href="/cek-status"
+                            className={`inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl font-bold text-lg backdrop-blur-md border shadow-lg transition-all hover:-translate-y-0.5 ${isDarkMode
+                                ? 'bg-indigo-950/60 border-indigo-700/60 text-indigo-200 hover:bg-indigo-900/70'
+                                : 'bg-white/50 border-white/70 text-[#2b1d18] hover:bg-white/70'
+                                }`}
+                        >
+                            <UserCheck className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                            Cek Status Pendaftaran
+                        </Link>
+
                         <a
                             href={`https://wa.me/${settings?.contact_wa || '6281234567890'}`}
                             target="_blank"
@@ -140,9 +151,9 @@ export default function LandingPage() {
                     <h2 className={`text-2xl font-bold text-center mb-8 ${isDarkMode ? 'text-white' : 'text-[#2b1d18]'}`}>
                         Alur &amp; Jadwal Pendaftaran
                     </h2>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 relative">
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-6 relative">
                         {/* Garis Penghubung */}
-                        <div className={`hidden md:block absolute top-8 left-[10%] right-[10%] h-0.5 z-0 ${isDarkMode ? 'bg-gray-700' : 'bg-[#d6c5b3]'}`}></div>
+                        <div className={`hidden md:block absolute top-8 left-[8%] right-[8%] h-0.5 z-0 ${isDarkMode ? 'bg-gray-700' : 'bg-[#d6c5b3]'}`}></div>
 
                         {(() => {
                             const now = new Date();
@@ -151,6 +162,7 @@ export default function LandingPage() {
                                 { step: 2, title: 'Verifikasi Berkas', desc: 'Panitia memeriksa kelengkapan berkas.', start: settings?.verif_start, end: settings?.verif_end },
                                 { step: 3, title: 'Tes Seleksi', desc: 'Tes potensi akademik dan wawancara.', start: settings?.test_start, end: settings?.test_end },
                                 { step: 4, title: 'Pengumuman', desc: 'Hasil seleksi dapat dicek di website.', start: settings?.announce_start, end: settings?.announce_end },
+                                { step: 5, title: 'Daftar Ulang', desc: 'Registrasi berkas & verifikasi MPLS.', start: settings?.rereg_start, end: settings?.rereg_end },
                             ];
 
                             return steps.map((item) => {

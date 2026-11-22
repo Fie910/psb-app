@@ -18,6 +18,26 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "PSB Online - SMK KH. A. WAHAB MUHSIN",
   description: "Penerimaan Peserta Didik Baru SMK KH. A. WAHAB MUHSIN",
+  icons: {
+    icon: [
+      { url: '/icon.png', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/icon.png' },
+    ],
+  },
+  openGraph: {
+    title: "PSB Online - SMK KH. A. WAHAB MUHSIN",
+    description: "Penerimaan Peserta Didik Baru SMK KH. A. WAHAB MUHSIN",
+    images: [
+      {
+        url: '/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: 'PSB Online SMK KH. A. WAHAB MUHSIN',
+      },
+    ],
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
