@@ -18,10 +18,11 @@ export async function POST(request: NextRequest) {
             SELECT 
                 a.id, a.registration_number, a.full_name, a.email, a.phone, 
                 a.asal_sekolah, a.father_name, a.mother_name, a.parent_phone,
-                a.school_choice, a.status, a.document_kk, a.document_akta, a.document_prestasi,
+                a.school_choice, a.school_choice_2, a.registration_path, a.status,
+                a.document_kk, a.document_akta, a.document_prestasi,
                 a.document_notes, a.revision_fields,
                 TO_CHAR(a.tanggal_lahir, 'YYYY-MM-DD') as tanggal_lahir,
-                a.nisn, a.registration_path,
+                a.nisn,
                 TO_CHAR(a.test_date, 'YYYY-MM-DD') as test_date, 
                 TO_CHAR(a.test_time, 'HH24:MI') as test_time, 
                 a.test_location,
