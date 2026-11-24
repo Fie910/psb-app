@@ -12,6 +12,16 @@ export async function GET() {
     const sql = getDb();
     await ensureReRegistrationSchema(sql);
 
+    try {
+      await sql`
+        ALTER TABLE applicants 
+        ADD COLUMN IF NOT EXISTS interview_recommendation VARCHAR(100),
+        ADD COLUMN IF NOT EXISTS interview_notes TEXT
+      `;
+    } catch (e) {
+      // ignore
+    }
+
     const applicants = await sql`
       SELECT 
         a.id, a.registration_number, a.full_name, a.email, a.phone, 
@@ -26,6 +36,7 @@ export async function GET() {
         TO_CHAR(a.interview_time, 'HH24:MI') as interview_time,
         a.interview_link,
         a.accepted_major, a.accepted_at,
+        a.interview_recommendation, a.interview_notes,
         r.id as rereg_id,
         r.rereg_status,
         r.rereg_notes,

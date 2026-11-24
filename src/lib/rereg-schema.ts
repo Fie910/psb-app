@@ -10,64 +10,69 @@ let schemaEnsured = false;
 export async function ensureReRegistrationSchema(sql: NeonQueryFunction<false, false>) {
     if (schemaEnsured) return;
 
-    await sql`
-        ALTER TABLE site_settings
-        ADD COLUMN IF NOT EXISTS rereg_start DATE,
-        ADD COLUMN IF NOT EXISTS rereg_end DATE,
-        ADD COLUMN IF NOT EXISTS rereg_instructions TEXT,
-        ADD COLUMN IF NOT EXISTS payment_portal_url TEXT DEFAULT 'https://gosiswa.com',
-        ADD COLUMN IF NOT EXISTS payment_tutorial_youtube_url TEXT,
-        ADD COLUMN IF NOT EXISTS major_quotas JSONB DEFAULT '{"Farmasi Klinis dan Komunitas": 72, "Produksi dan Siaran Program Televisi": 36, "Manajemen Perkantoran": 72}'::jsonb,
-        ADD COLUMN IF NOT EXISTS allowed_registration_paths VARCHAR(20) NOT NULL DEFAULT 'ALL'
-    `;
+    try {
+        await sql`
+            ALTER TABLE site_settings
+            ADD COLUMN IF NOT EXISTS rereg_start DATE,
+            ADD COLUMN IF NOT EXISTS rereg_end DATE,
+            ADD COLUMN IF NOT EXISTS rereg_instructions TEXT,
+            ADD COLUMN IF NOT EXISTS payment_portal_url TEXT DEFAULT 'https://gosiswa.com',
+            ADD COLUMN IF NOT EXISTS payment_tutorial_youtube_url TEXT,
+            ADD COLUMN IF NOT EXISTS major_quotas JSONB DEFAULT '{"Farmasi Klinis dan Komunitas": 72, "Produksi dan Siaran Program Televisi": 36, "Manajemen Perkantoran": 72}'::jsonb,
+            ADD COLUMN IF NOT EXISTS allowed_registration_paths VARCHAR(20) NOT NULL DEFAULT 'ALL'
+        `;
 
-    await sql`
-        CREATE TABLE IF NOT EXISTS re_registrations (
-            id SERIAL PRIMARY KEY,
-            applicant_id INTEGER NOT NULL UNIQUE REFERENCES applicants(id) ON DELETE CASCADE,
-            payment_scheme VARCHAR(60) NOT NULL DEFAULT 'Minimal (DP)',
-            doc_kuitansi_gosiswa TEXT NOT NULL,
-            nik VARCHAR(16) NOT NULL,
-            no_kk VARCHAR(16) NOT NULL,
-            birth_place VARCHAR(100) NOT NULL,
-            gender VARCHAR(20) NOT NULL,
-            religion VARCHAR(30) NOT NULL,
-            child_order INTEGER,
-            siblings_count INTEGER,
-            address_street TEXT NOT NULL,
-            rt_rw VARCHAR(20),
-            village VARCHAR(100) NOT NULL,
-            district VARCHAR(100) NOT NULL,
-            city VARCHAR(100) NOT NULL,
-            postal_code VARCHAR(10),
-            living_with VARCHAR(50),
-            height_cm INTEGER,
-            weight_kg INTEGER,
-            blood_type VARCHAR(15),
-            medical_notes TEXT,
-            uniform_size VARCHAR(10) NOT NULL,
-            father_nik VARCHAR(16),
-            father_education VARCHAR(50),
-            father_occupation VARCHAR(100),
-            father_income VARCHAR(60),
-            mother_nik VARCHAR(16),
-            mother_education VARCHAR(50),
-            mother_occupation VARCHAR(100),
-            mother_income VARCHAR(60),
-            guardian_name VARCHAR(150),
-            guardian_phone VARCHAR(25),
-            guardian_occupation VARCHAR(100),
-            doc_pas_foto TEXT NOT NULL,
-            doc_skl_ijazah TEXT NOT NULL,
-            doc_pernyataan TEXT NOT NULL,
-            rereg_status VARCHAR(40) NOT NULL DEFAULT 'Menunggu Verifikasi',
-            rereg_notes TEXT,
-            submitted_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-            verified_at TIMESTAMP WITH TIME ZONE
-        )
-    `;
+        await sql`
+            CREATE TABLE IF NOT EXISTS re_registrations (
+                id SERIAL PRIMARY KEY,
+                applicant_id INTEGER NOT NULL UNIQUE REFERENCES applicants(id) ON DELETE CASCADE,
+                payment_scheme VARCHAR(60) NOT NULL DEFAULT 'Minimal (DP)',
+                doc_kuitansi_gosiswa TEXT NOT NULL,
+                nik VARCHAR(16) NOT NULL,
+                no_kk VARCHAR(16) NOT NULL,
+                birth_place VARCHAR(100) NOT NULL,
+                gender VARCHAR(20) NOT NULL,
+                religion VARCHAR(30) NOT NULL,
+                child_order INTEGER,
+                siblings_count INTEGER,
+                address_street TEXT NOT NULL,
+                rt_rw VARCHAR(20),
+                village VARCHAR(100) NOT NULL,
+                district VARCHAR(100) NOT NULL,
+                city VARCHAR(100) NOT NULL,
+                postal_code VARCHAR(10),
+                living_with VARCHAR(50),
+                height_cm INTEGER,
+                weight_kg INTEGER,
+                blood_type VARCHAR(15),
+                medical_notes TEXT,
+                uniform_size VARCHAR(10) NOT NULL,
+                father_nik VARCHAR(16),
+                father_education VARCHAR(50),
+                father_occupation VARCHAR(100),
+                father_income VARCHAR(60),
+                mother_nik VARCHAR(16),
+                mother_education VARCHAR(50),
+                mother_occupation VARCHAR(100),
+                mother_income VARCHAR(60),
+                guardian_name VARCHAR(150),
+                guardian_phone VARCHAR(25),
+                guardian_occupation VARCHAR(100),
+                doc_pas_foto TEXT NOT NULL,
+                doc_skl_ijazah TEXT NOT NULL,
+                doc_pernyataan TEXT NOT NULL,
+                rereg_status VARCHAR(40) NOT NULL DEFAULT 'Menunggu Verifikasi',
+                rereg_notes TEXT,
+                submitted_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                verified_at TIMESTAMP WITH TIME ZONE
+            )
+        `;
 
-    schemaEnsured = true;
+        schemaEnsured = true;
+    } catch (err) {
+        // Jangan biarkan migrasi DDL otomatis membuat API crash jika koneksi lambat/timeout
+        console.warn('[rereg-schema] Gagal memastikan skema (mungkin cold start/timeout):', (err as any)?.message || err);
+    }
 }
 
 /**

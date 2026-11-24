@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { AwsClient } from 'aws4fetch';
 import { ensureReRegistrationSchema } from '@/lib/rereg-schema';
+import { createAdminNotification } from '@/lib/notifications';
 
 function createS3Client() {
     return new AwsClient({
@@ -105,7 +106,6 @@ async function fetchApplicantAndRereg(nisn: string, tanggalLahir: string) {
     };
 }
 
-// GET /api/daftar-ulang?nisn=...&tanggal_lahir=...
 export async function GET(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url);
@@ -133,7 +133,6 @@ export async function GET(request: NextRequest) {
     }
 }
 
-// POST /api/daftar-ulang (action: 'lookup' atau submit baru / upsert)
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
@@ -144,7 +143,6 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'NISN dan Tanggal Lahir wajib diisi.' }, { status: 400 });
         }
 
-        // Mode lookup data siswa & status daftar ulang
         if (body.action === 'lookup') {
             const result = await fetchApplicantAndRereg(nisn, tanggalLahir);
             if (result.error) {
@@ -158,7 +156,6 @@ export async function POST(request: NextRequest) {
             });
         }
 
-        // Mode submit formulir daftar ulang
         return await handleSaveReRegistration(body, nisn, tanggalLahir);
     } catch (error) {
         console.error('POST /api/daftar-ulang error:', error);
@@ -166,7 +163,6 @@ export async function POST(request: NextRequest) {
     }
 }
 
-// PUT /api/daftar-ulang (perbaikan / pembaruan data daftar ulang)
 export async function PUT(request: NextRequest) {
     try {
         const body = await request.json();
@@ -189,7 +185,8 @@ async function handleSaveReRegistration(body: Record<string, unknown>, nisn: str
     await ensureReRegistrationSchema(sql);
 
     const applicants = await sql`
-        SELECT id, status FROM applicants
+        SELECT id, registration_number, full_name, school_choice, accepted_major, status
+        FROM applicants
         WHERE nisn = ${nisn} AND tanggal_lahir = ${tanggalLahir}
         LIMIT 1
     `;
@@ -237,7 +234,6 @@ async function handleSaveReRegistration(body: Record<string, unknown>, nisn: str
         );
     }
 
-    // Cek apakah sudah ada data sebelumnya
     const existingRows = await sql`
         SELECT * FROM re_registrations WHERE applicant_id = ${applicant.id} LIMIT 1
     `;
@@ -250,7 +246,6 @@ async function handleSaveReRegistration(body: Record<string, unknown>, nisn: str
         );
     }
 
-    // Hapus file lama di S3/R2 jika diganti saat perbaikan
     if (existing) {
         if (existing.doc_kuitansi_gosiswa && existing.doc_kuitansi_gosiswa !== doc_kuitansi_gosiswa) {
             await deleteOldS3Object(existing.doc_kuitansi_gosiswa);
@@ -360,6 +355,16 @@ async function handleSaveReRegistration(body: Record<string, unknown>, nisn: str
             submitted_at = CURRENT_TIMESTAMP
         RETURNING *
     `;
+
+    const majorLabel = applicant.accepted_major || applicant.school_choice;
+    await createAdminNotification({
+        type: 'REREG_SUBMITTED',
+        title: existing ? 'Perbaikan Daftar Ulang Dikirim' : 'Daftar Ulang Baru Masuk',
+        message: `${applicant.full_name} (${majorLabel}) mengirimkan berkas daftar ulang & kuitansi (${payment_scheme}).`,
+        applicantId: applicant.id,
+        registrationNumber: applicant.registration_number,
+        applicantName: applicant.full_name,
+    });
 
     const pasFotoPreviewUrl = await getPresignedReadUrl(doc_pas_foto);
 

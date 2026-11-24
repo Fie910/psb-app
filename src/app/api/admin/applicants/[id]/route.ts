@@ -19,6 +19,18 @@ export async function GET(
         }
 
         const sql = getDb();
+
+        // Pastikan kolom interview_recommendation dan interview_notes ada secara idempoten
+        try {
+            await sql`
+                ALTER TABLE applicants 
+                ADD COLUMN IF NOT EXISTS interview_recommendation VARCHAR(100),
+                ADD COLUMN IF NOT EXISTS interview_notes TEXT
+            `;
+        } catch (e) {
+            // Abaikan jika alter gagal sementara (misal permission)
+        }
+
         const applicants = await sql`
             SELECT 
                 id, registration_number, full_name, email, phone, 
@@ -32,7 +44,8 @@ export async function GET(
                 TO_CHAR(interview_date, 'YYYY-MM-DD') as interview_date, 
                 TO_CHAR(interview_time, 'HH24:MI') as interview_time, 
                 interview_link,
-                accepted_major, accepted_at
+                accepted_major, accepted_at,
+                interview_recommendation, interview_notes
             FROM applicants 
             WHERE id = ${applicantId}
             LIMIT 1
@@ -42,7 +55,18 @@ export async function GET(
             return NextResponse.json({ error: 'Data peserta tidak ditemukan' }, { status: 404 });
         }
 
-        return NextResponse.json({ applicant: applicants[0] });
+        // Ambil hasil ujian CBT (TPA & Diagnostik / kategori lain)
+        const examResults = await sql`
+            SELECT category, raw_score, interpretation, completed_at, status
+            FROM exam_results
+            WHERE applicant_id = ${applicantId} AND status = 'Selesai'
+            ORDER BY completed_at ASC
+        `;
+
+        return NextResponse.json({ 
+            applicant: applicants[0],
+            exam_results: examResults
+        });
     } catch (error) {
         console.error('Error fetch applicant detail:', error);
         return NextResponse.json({ error: 'Gagal mengambil data peserta' }, { status: 500 });

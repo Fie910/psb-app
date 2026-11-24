@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { ensureReRegistrationSchema, normalizeAllowedPaths } from '@/lib/rereg-schema';
+import { createAdminNotification } from '@/lib/notifications';
 
 export async function POST(request: NextRequest) {
     try {
@@ -27,7 +28,6 @@ export async function POST(request: NextRequest) {
             document_prestasi,
         } = body;
 
-        // Validasi field wajib dasar
         if (!full_name || !nisn || !tanggal_lahir || !asal_sekolah || !email || !father_name || !mother_name || !parent_phone || !school_choice) {
             return NextResponse.json({ error: 'Semua data wajib harus diisi.' }, { status: 400 });
         }
@@ -36,7 +36,6 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Scan Kartu Keluarga (KK) dan Akta Kelahiran wajib diunggah.' }, { status: 400 });
         }
 
-        // Ambil pengaturan gelombang & penguncian jalur dari database
         const settingsRows = await sql`
             SELECT wave_name, allowed_registration_paths, is_open_manual, use_auto_schedule, reg_start, reg_end
             FROM site_settings
@@ -47,7 +46,6 @@ export async function POST(request: NextRequest) {
         const allowedPaths = normalizeAllowedPaths(settings?.allowed_registration_paths);
         const waveName = settings?.wave_name || 'Gelombang Aktif';
 
-        // Cek status buka/tutup pendaftaran
         if (settings) {
             let isOpen = Boolean(settings.is_open_manual);
             if (settings.use_auto_schedule && settings.reg_start && settings.reg_end) {
@@ -64,7 +62,6 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // Validasi penguncian jalur pendaftaran pada gelombang ini
         const submittedPath = String(registration_path || '').trim();
         if (allowedPaths === 'Prestasi' && submittedPath !== 'Prestasi') {
             return NextResponse.json(
@@ -82,7 +79,6 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Jalur pendaftaran tidak valid.' }, { status: 400 });
         }
 
-        // Jika jalur Prestasi, dokumen prestasi wajib dilampirkan
         if (submittedPath === 'Prestasi' && !document_prestasi) {
             return NextResponse.json(
                 { error: 'Dokumen raport/sertifikat prestasi (PDF) wajib diunggah untuk Jalur Prestasi.' },
@@ -90,7 +86,6 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Cek duplikasi NISN atau Email
         const existing = await sql`
             SELECT id, nisn, email FROM applicants
             WHERE nisn = ${nisn.trim()} OR LOWER(email) = LOWER(${email.trim()})
@@ -103,7 +98,6 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Email sudah terdaftar di sistem.' }, { status: 409 });
         }
 
-        // Generate Nomor Pendaftaran unik
         const year = new Date().getFullYear();
         let registrationNumber = '';
         for (let attempt = 0; attempt < 5; attempt++) {
@@ -157,16 +151,27 @@ export async function POST(request: NextRequest) {
                 ${submittedPath === 'Prestasi' ? document_prestasi : null},
                 'Pending'
             )
-            RETURNING registration_number, full_name, school_choice, registration_path
+            RETURNING id, registration_number, full_name, school_choice, registration_path
         `;
+
+        const newApplicant = inserted[0];
+
+        await createAdminNotification({
+            type: 'NEW_APPLICANT',
+            title: `Pendaftar Baru (${newApplicant.registration_path})`,
+            message: `${newApplicant.full_name} mendaftar pada pilihan ${newApplicant.school_choice}.`,
+            applicantId: newApplicant.id,
+            registrationNumber: newApplicant.registration_number,
+            applicantName: newApplicant.full_name,
+        });
 
         return NextResponse.json(
             {
                 message: 'Pendaftaran berhasil!',
-                registration_number: inserted[0].registration_number,
-                full_name: inserted[0].full_name,
-                school_choice: inserted[0].school_choice,
-                registration_path: inserted[0].registration_path,
+                registration_number: newApplicant.registration_number,
+                full_name: newApplicant.full_name,
+                school_choice: newApplicant.school_choice,
+                registration_path: newApplicant.registration_path,
             },
             { status: 201 }
         );

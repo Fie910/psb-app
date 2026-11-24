@@ -14,7 +14,18 @@ export async function GET(request: NextRequest) {
     try {
         const sql = getDb();
         const scores = await sql`SELECT rubric_id, score FROM interview_scores WHERE applicant_id = ${applicantId}`;
-        return NextResponse.json({ scores });
+        const applicantInfo = await sql`
+            SELECT interview_recommendation, interview_notes 
+            FROM applicants 
+            WHERE id = ${applicantId}
+            LIMIT 1
+        `;
+
+        return NextResponse.json({ 
+            scores,
+            interview_recommendation: applicantInfo[0]?.interview_recommendation || '',
+            interview_notes: applicantInfo[0]?.interview_notes || ''
+        });
     } catch (error) {
         console.error('Error fetch interview scores:', error);
         return NextResponse.json({ error: 'Gagal mengambil data' }, { status: 500 });
@@ -30,14 +41,29 @@ export async function POST(request: NextRequest) {
         const body = await request.json();
         const applicant_id = body.applicant_id;
         const scores = body.scores as Record<string, number>;
+        const interview_recommendation = body.interview_recommendation !== undefined ? String(body.interview_recommendation).trim() : null;
+        const interview_notes = body.interview_notes !== undefined ? String(body.interview_notes).trim() : null;
 
         if (!applicant_id || !scores) {
             return NextResponse.json({ error: 'Data tidak lengkap' }, { status: 400 });
         }
 
+        // Pastikan kolom tersedia
+        try {
+            await sql`
+                ALTER TABLE applicants 
+                ADD COLUMN IF NOT EXISTS interview_recommendation VARCHAR(100),
+                ADD COLUMN IF NOT EXISTS interview_notes TEXT
+            `;
+        } catch (e) {
+            // ignore
+        }
+
+        // Hapus skor lama
         await sql`DELETE FROM interview_scores WHERE applicant_id = ${applicant_id}`;
         await sql`DELETE FROM exam_results WHERE applicant_id = ${applicant_id} AND category = 'WAWANCARA'`;
 
+        // Simpan skor rubrik
         for (const [rubric_id, score] of Object.entries(scores)) {
             await sql`
                 INSERT INTO interview_scores (applicant_id, rubric_id, score)
@@ -59,14 +85,28 @@ export async function POST(request: NextRequest) {
                     ${applicant_id}, 
                     'WAWANCARA', 
                     'Selesai', 
-                    ${JSON.stringify({ total_skor: totalScore, max_skor: maxScore })}::jsonb, 
-                    ${'Wawancara selesai dengan total skor: ' + totalScore + ' / ' + maxScore},
+                    ${JSON.stringify({ 
+                        total_skor: totalScore, 
+                        max_skor: maxScore,
+                        recommendation: interview_recommendation || undefined
+                    })}::jsonb, 
+                    ${interview_recommendation 
+                        ? `Wawancara: ${interview_recommendation} (Skor: ${totalScore}/${maxScore})` 
+                        : `Wawancara selesai dengan total skor: ${totalScore} / ${maxScore}`},
                     CURRENT_TIMESTAMP
                 )
             `;
         }
 
-        return NextResponse.json({ message: 'Skor berhasil disimpan' });
+        // Simpan interview_recommendation dan interview_notes ke applicants
+        await sql`
+            UPDATE applicants
+            SET interview_recommendation = ${interview_recommendation || null},
+                interview_notes = ${interview_notes || null}
+            WHERE id = ${applicant_id}
+        `;
+
+        return NextResponse.json({ message: 'Skor dan rekomendasi berhasil disimpan' });
     } catch (error) {
         console.error('Error simpan wawancara:', error);
         return NextResponse.json({ error: 'Gagal menyimpan skor wawancara' }, { status: 500 });

@@ -8,6 +8,10 @@ import { useReactToPrint } from 'react-to-print';
 import toast, { Toaster } from 'react-hot-toast';
 import { useTheme } from '@/context/ThemeContext';
 import ThemeToggle from '@/components/ThemeToggle';
+import AdminNotificationBell, { AdminNotificationItem } from '@/components/AdminNotificationBell';
+import AdminBulkActionBar, { BulkApplicantSummary } from '@/components/AdminBulkActionBar';
+import AdminWhatsAppButton from '@/components/AdminWhatsAppButton';
+import { WhatsAppSiteSettings } from '@/lib/whatsapp-templates';
 import {
     FileSpreadsheet,
     UserPlus,
@@ -39,8 +43,10 @@ import {
     Shirt,
     MessageCircle,
     Database,
-    ShieldCheck
+    ShieldCheck,
+    Trophy
 } from 'lucide-react';
+import AdminRankingPanel from '@/components/AdminRankingPanel';
 
 type Applicant = {
     id: number;
@@ -72,8 +78,9 @@ type Applicant = {
     interview_date: string | null;
     interview_time: string | null;
     interview_link: string | null;
+    interview_recommendation?: string | null;
+    interview_notes?: string | null;
 
-    // Kolom Join Daftar Ulang (re_registrations)
     rereg_id?: number | null;
     rereg_status?: string | null;
     rereg_notes?: string | null;
@@ -114,6 +121,8 @@ type Applicant = {
     guardian_occupation?: string | null;
     rereg_submitted_at?: string | null;
     rereg_verified_at?: string | null;
+
+
 };
 
 const DIMENSION_NAMES: Record<string, Record<string, string>> = {
@@ -139,7 +148,10 @@ export default function AdminDashboard() {
     const { isDarkMode } = useTheme();
     const [applicants, setApplicants] = useState<Applicant[]>([]);
     const [majorQuotas, setMajorQuotas] = useState<Record<string, number>>(DEFAULT_QUOTAS);
-    const [isLoading, setIsLoading] = useState<boolean>(true);
+    const [siteSettings, setSiteSettings] = useState<WhatsAppSiteSettings | null>(null);
+    const [selectedIds, setSelectedIds] = useState<number[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [activeTab, setActiveTab] = useState<'table' | 'ranking'>('table');
 
     // State Filter Multi-Kriteria
     const [searchQuery, setSearchQuery] = useState<string>('');
@@ -197,21 +209,24 @@ export default function AdminDashboard() {
 
     useEffect(() => {
         fetchApplicants();
-        fetchSettingsQuotas();
+        fetchSettingsAndQuotas();
     }, []);
 
-    const fetchSettingsQuotas = async () => {
+    const fetchSettingsAndQuotas = async () => {
         try {
             const res = await fetch('/api/settings');
             const data = await res.json();
-            if (data.settings?.major_quotas) {
-                const parsed = typeof data.settings.major_quotas === 'string'
-                    ? JSON.parse(data.settings.major_quotas)
-                    : data.settings.major_quotas;
-                setMajorQuotas({ ...DEFAULT_QUOTAS, ...parsed });
+            if (data.settings) {
+                setSiteSettings(data.settings);
+                if (data.settings.major_quotas) {
+                    const parsed = typeof data.settings.major_quotas === 'string'
+                        ? JSON.parse(data.settings.major_quotas)
+                        : data.settings.major_quotas;
+                    setMajorQuotas({ ...DEFAULT_QUOTAS, ...parsed });
+                }
             }
         } catch {
-            // Gunakan kuota default jika gagal memuat pengaturan
+            // Gunakan kuota & pengaturan default jika gagal memuat pengaturan
         }
     };
 
@@ -233,7 +248,23 @@ export default function AdminDashboard() {
         }
     };
 
-    // Perhitungan KPI, Statistik Daftar Ulang & Kuota Jurusan
+    const handleSelectNotification = (item: AdminNotificationItem) => {
+        setStatusFilter('ALL');
+        setMajorFilter('ALL');
+        setPathFilter('ALL');
+        setReregFilter('ALL');
+
+        fetchApplicants();
+
+        if (item.registration_number) {
+            setSearchQuery(item.registration_number);
+            toast.success(`Menampilkan data: ${item.applicant_name || item.registration_number}`);
+        } else if (item.applicant_name) {
+            setSearchQuery(item.applicant_name);
+            toast.success(`Menampilkan data: ${item.applicant_name}`);
+        }
+    };
+
     const stats = useMemo(() => {
         const total = applicants.length;
         const pending = applicants.filter((a) => a.status === 'Pending').length;
@@ -244,7 +275,6 @@ export default function AdminDashboard() {
         const prestasiCount = applicants.filter((a) => a.registration_path === 'Prestasi').length;
         const regulerCount = total - prestasiCount;
 
-        // Statistik Daftar Ulang
         const reregSubmitted = applicants.filter((a) => Boolean(a.rereg_status)).length;
         const reregWaiting = applicants.filter((a) => a.rereg_status === 'Menunggu Verifikasi').length;
         const reregRevision = applicants.filter((a) => a.rereg_status === 'Perbaikan Daftar Ulang').length;
@@ -331,6 +361,43 @@ export default function AdminDashboard() {
         });
     }, [applicants, searchQuery, statusFilter, majorFilter, pathFilter, reregFilter]);
 
+    // Logika Checkbox Multi-Select (Bulk Action)
+    const filteredIds = useMemo(() => filteredApplicants.map((a) => a.id), [filteredApplicants]);
+    const isAllFilteredSelected =
+        filteredApplicants.length > 0 &&
+        filteredApplicants.every((a) => selectedIds.includes(a.id));
+    const isSomeFilteredSelected =
+        filteredApplicants.some((a) => selectedIds.includes(a.id)) && !isAllFilteredSelected;
+
+    const handleToggleSelectAll = () => {
+        if (isAllFilteredSelected) {
+            setSelectedIds((prev) => prev.filter((id) => !filteredIds.includes(id)));
+        } else {
+            setSelectedIds((prev) => Array.from(new Set([...prev, ...filteredIds])));
+        }
+    };
+
+    const handleToggleSelectRow = (id: number) => {
+        setSelectedIds((prev) =>
+            prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+        );
+    };
+
+    const selectedApplicantsSummary: BulkApplicantSummary[] = useMemo(
+        () =>
+            applicants
+                .filter((a) => selectedIds.includes(a.id))
+                .map((a) => ({
+                    id: a.id,
+                    full_name: a.full_name,
+                    registration_number: a.registration_number,
+                    school_choice: a.school_choice,
+                    school_choice_2: a.school_choice_2,
+                    status: a.status,
+                })),
+        [applicants, selectedIds]
+    );
+
     const hasActiveFilters =
         searchQuery.trim() !== '' ||
         statusFilter !== 'ALL' ||
@@ -346,7 +413,6 @@ export default function AdminDashboard() {
         setReregFilter('ALL');
     };
 
-    // 1. Ekspor Data Pendaftar Umum
     const handleExportExcel = () => {
         setExportMenuOpen(false);
         const sourceData = filteredApplicants;
@@ -380,7 +446,6 @@ export default function AdminDashboard() {
         toast.success(`Berhasil mengekspor ${sourceData.length} data pendaftar`);
     };
 
-    // 2. Ekspor Format Siap Dapodik (.xlsx)
     const handleExportDapodik = () => {
         setExportMenuOpen(false);
         const reregStudents = applicants.filter((a) => Boolean(a.rereg_status));
@@ -441,7 +506,6 @@ export default function AdminDashboard() {
         toast.success(`Berhasil mengekspor ${reregStudents.length} data siap Dapodik!`);
     };
 
-    // 3. Ekspor Rekap Ukuran Seragam & Pembayaran gosiswa.com (.xlsx)
     const handleExportSeragamPembayaran = () => {
         setExportMenuOpen(false);
         const reregStudents = applicants.filter((a) => Boolean(a.rereg_status));
@@ -659,23 +723,6 @@ export default function AdminDashboard() {
         setRevisionModalOpen(true);
     };
 
-    const openInterviewModal = async (app: Applicant) => {
-        setSelectedApp(app);
-        setInterviewModalOpen(true);
-        try {
-            const res = await fetch('/api/admin/rubric');
-            const data = await res.json();
-            if (res.ok) setInterviewRubric(data.rubric);
-            const scoreRes = await fetch(`/api/admin/interview-scores?applicant_id=${app.id}`);
-            const scoreData = await scoreRes.json();
-            if (scoreRes.ok && scoreData.scores) {
-                const existingScores: Record<number, number> = {};
-                scoreData.scores.forEach((s: any) => { existingScores[s.rubric_id] = s.score; });
-                setInterviewScores(existingScores);
-            }
-        } catch { toast.error('Gagal memuat rubrik'); }
-    };
-
     const handleSaveSchedule = async () => {
         if (!selectedApp) return;
         const loadingToast = toast.loading('Menyimpan jadwal & jurusan...');
@@ -767,13 +814,12 @@ export default function AdminDashboard() {
     };
 
     return (
-        <main className={`min-h-screen p-4 sm:p-8 transition-colors duration-500 font-sans relative overflow-x-hidden ${isDarkMode
+        <main className={`min-h-screen p-4 sm:p-8 pb-28 transition-colors duration-500 font-sans relative overflow-x-hidden ${isDarkMode
             ? 'bg-linear-to-br from-gray-950 via-slate-900 to-black text-gray-100'
             : 'bg-linear-to-br from-[#d5beaa] via-[#b89779] to-[#987657] text-[#1f1410]'
             }`}>
             <Toaster position="top-center" />
 
-            {/* Ambient modern glass glow */}
             <div className={`absolute top-[-10%] left-[-10%] w-[500px] h-[500px] rounded-full mix-blend-multiply filter blur-[120px] pointer-events-none transition-all duration-700 ${isDarkMode ? 'bg-indigo-600/20' : 'bg-[#e3c8af]/40'
                 }`}></div>
             <div className={`absolute bottom-[-10%] right-[-10%] w-[450px] h-[450px] rounded-full mix-blend-multiply filter blur-[120px] pointer-events-none transition-all duration-700 ${isDarkMode ? 'bg-teal-600/15' : 'bg-[#f0decb]/40'
@@ -781,7 +827,7 @@ export default function AdminDashboard() {
 
             <div className="max-w-[1540px] mx-auto z-10 relative space-y-6">
                 {/* Header Card */}
-                <div className={`p-6 sm:p-8 rounded-3xl border backdrop-blur-xl shadow-xl transition-all duration-300 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 relative z-20 ${isDarkMode
+                <div className={`p-6 sm:p-8 rounded-3xl border backdrop-blur-xl shadow-xl transition-all duration-300 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 ${isDarkMode
                     ? 'bg-gray-900/75 border-gray-800 shadow-black/40'
                     : 'bg-[#fffdf9]/92 border-white shadow-[#5c4033]/15'
                     }`}>
@@ -798,12 +844,12 @@ export default function AdminDashboard() {
                             Dashboard Verifikasi, Seleksi &amp; Daftar Ulang
                         </h1>
                         <p className={`text-sm sm:text-[15px] mt-1 font-medium ${isDarkMode ? 'text-gray-300' : 'text-[#4a352b]'}`}>
-                            SMK KH. A. WAHAB MUHSIN &bull; Reguler: <span className="font-extrabold">{stats.regulerCount}</span> &bull; Prestasi: <span className="font-extrabold">{stats.prestasiCount}</span> &bull; Resmi DU: <span className="font-extrabold text-emerald-700 dark:text-emerald-400">{stats.reregVerified}</span>
+                            {siteSettings?.school_name || 'SMK KH. A. WAHAB MUHSIN'} &bull; Reguler: <span className="font-extrabold">{stats.regulerCount}</span> &bull; Prestasi: <span className="font-extrabold">{stats.prestasiCount}</span> &bull; Resmi DU: <span className="font-extrabold text-emerald-700 dark:text-emerald-400">{stats.reregVerified}</span>
                         </p>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto">
-                        {/* Dropdown Ekspor Excel (Umum, Dapodik, Seragam & Pembayaran) */}
+                        {/* Dropdown Ekspor Excel */}
                         <div className="relative">
                             <button
                                 type="button"
@@ -912,13 +958,15 @@ export default function AdminDashboard() {
                             <span>Pengaturan</span>
                         </Link>
 
+                        {/* Lonceng Notifikasi Panitia */}
+                        <AdminNotificationBell onSelectNotification={handleSelectNotification} />
+
                         <ThemeToggle />
                     </div>
                 </div>
 
-                {/* KPI SUMMARY CARDS (7 Kartu: 6 Seleksi + 1 Daftar Ulang) */}
+                {/* KPI SUMMARY CARDS */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-                    {/* Total Pendaftar */}
                     <button
                         type="button"
                         onClick={() => { setStatusFilter('ALL'); setReregFilter('ALL'); }}
@@ -947,7 +995,6 @@ export default function AdminDashboard() {
                         </p>
                     </button>
 
-                    {/* Pending */}
                     <button
                         type="button"
                         onClick={() => toggleStatusCardFilter('Pending')}
@@ -976,7 +1023,6 @@ export default function AdminDashboard() {
                         </p>
                     </button>
 
-                    {/* Perbaikan */}
                     <button
                         type="button"
                         onClick={() => toggleStatusCardFilter('Perbaikan')}
@@ -1005,7 +1051,6 @@ export default function AdminDashboard() {
                         </p>
                     </button>
 
-                    {/* Siap Seleksi */}
                     <button
                         type="button"
                         onClick={() => toggleStatusCardFilter('SIAP_TES')}
@@ -1034,7 +1079,6 @@ export default function AdminDashboard() {
                         </p>
                     </button>
 
-                    {/* Diterima */}
                     <button
                         type="button"
                         onClick={() => toggleStatusCardFilter('Diterima')}
@@ -1063,7 +1107,6 @@ export default function AdminDashboard() {
                         </p>
                     </button>
 
-                    {/* Daftar Ulang (Terverifikasi / Masuk) */}
                     <button
                         type="button"
                         onClick={() => setReregFilter((prev) => (prev === 'MENUNGGU' ? 'ALL' : 'MENUNGGU'))}
@@ -1092,7 +1135,6 @@ export default function AdminDashboard() {
                         </p>
                     </button>
 
-                    {/* Ditolak */}
                     <button
                         type="button"
                         onClick={() => toggleStatusCardFilter('Ditolak')}
@@ -1200,429 +1242,529 @@ export default function AdminDashboard() {
                     </div>
                 </div>
 
-                {/* Main Table Container */}
-                <div className={`p-5 sm:p-6 rounded-3xl border backdrop-blur-xl shadow-xl transition-all duration-300 ${isDarkMode
-                    ? 'bg-gray-900/75 border-gray-800 shadow-black/40'
-                    : 'bg-[#fffdf9]/95 border-white shadow-[#5c4033]/15'
-                    }`}>
-                    {/* Search & Multi-Criteria Filter Bar */}
-                    <div className="flex flex-col xl:flex-row justify-between items-stretch xl:items-center gap-3.5 mb-6">
-                        <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2.5 flex-1">
-                            {/* Input Pencarian */}
-                            <div className="relative flex-1 min-w-[230px] max-w-sm">
-                                <Search className={`w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 ${isDarkMode ? 'text-gray-400' : 'text-[#6e5346]'}`} />
-                                <input
-                                    type="text"
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    placeholder="Cari nama, NISN, NIK, no reg, SMP..."
-                                    className={`w-full pl-10 pr-4 py-2.5 text-xs sm:text-sm font-medium rounded-xl border transition-all outline-none ${isDarkMode
-                                        ? 'bg-gray-950/80 border-gray-700 text-white placeholder-gray-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                                        : 'bg-white border-[#cbb7a2] text-[#1f1410] placeholder-[#7a6358] focus:border-[#b85c38] focus:ring-2 focus:ring-[#b85c38]/20'
-                                        }`}
-                                />
+                {/* Tab Switcher: Data Pendaftar vs Rekap Peringkat */}
+                <div
+                    className={`p-1.5 rounded-2xl border inline-flex gap-1 ${isDarkMode
+                        ? 'bg-gray-900/75 border-gray-800'
+                        : 'bg-[#fffdf9]/92 border-white shadow-sm'
+                        }`}
+                >
+                    <button
+                        type="button"
+                        onClick={() => setActiveTab('table')}
+                        className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold flex items-center gap-2 transition-all ${activeTab === 'table'
+                            ? isDarkMode
+                                ? 'bg-indigo-600 text-white shadow-md'
+                                : 'bg-[#b85c38] text-white shadow-md'
+                            : isDarkMode
+                                ? 'text-gray-300 hover:bg-gray-800'
+                                : 'text-[#4a352b] hover:bg-[#faf4ec]'
+                            }`}
+                    >
+                        <Users className="w-4 h-4" />
+                        <span>Data Pendaftar &amp; Verifikasi</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setActiveTab('ranking')}
+                        className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold flex items-center gap-2 transition-all ${activeTab === 'ranking'
+                            ? isDarkMode
+                                ? 'bg-emerald-600 text-white shadow-md'
+                                : 'bg-emerald-700 text-white shadow-md'
+                            : isDarkMode
+                                ? 'text-gray-300 hover:bg-gray-800'
+                                : 'text-[#4a352b] hover:bg-[#faf4ec]'
+                            }`}
+                    >
+                        <Trophy className="w-4 h-4" />
+                        <span>Rekap Nilai &amp; Peringkat</span>
+                    </button>
+                </div>
+
+                {/* Main Table Container (hanya tampil pada tab Data Pendaftar) */}
+                {activeTab === 'table' && (
+                    <div className={`p-5 sm:p-6 rounded-3xl border backdrop-blur-xl shadow-xl transition-all duration-300 ${isDarkMode
+                        ? 'bg-gray-900/75 border-gray-800 shadow-black/40'
+                        : 'bg-[#fffdf9]/95 border-white shadow-[#5c4033]/15'
+                        }`}>
+                        {/* Search & Multi-Criteria Filter Bar */}
+                        <div className="flex flex-col xl:flex-row justify-between items-stretch xl:items-center gap-3.5 mb-6">
+                            <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2.5 flex-1">
+                                <div className="relative flex-1 min-w-[230px] max-w-sm">
+                                    <Search className={`w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 ${isDarkMode ? 'text-gray-400' : 'text-[#6e5346]'}`} />
+                                    <input
+                                        type="text"
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        placeholder="Cari nama, NISN, NIK, no reg, SMP..."
+                                        className={`w-full pl-10 pr-4 py-2.5 text-xs sm:text-sm font-medium rounded-xl border transition-all outline-none ${isDarkMode
+                                            ? 'bg-gray-950/80 border-gray-700 text-white placeholder-gray-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                                            : 'bg-white border-[#cbb7a2] text-[#1f1410] placeholder-[#7a6358] focus:border-[#b85c38] focus:ring-2 focus:ring-[#b85c38]/20'
+                                            }`}
+                                    />
+                                </div>
+
+                                <div className="relative">
+                                    <Filter className={`w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none ${isDarkMode ? 'text-gray-400' : 'text-[#5c4337]'}`} />
+                                    <select
+                                        value={statusFilter}
+                                        onChange={(e) => setStatusFilter(e.target.value)}
+                                        aria-label="Filter Status Seleksi"
+                                        className={`appearance-none pl-8 pr-8 py-2.5 text-xs sm:text-sm font-bold rounded-xl border outline-none cursor-pointer ${isDarkMode
+                                            ? 'bg-gray-950/80 border-gray-700 text-gray-100 focus:border-indigo-500'
+                                            : 'bg-white border-[#cbb7a2] text-[#1f1410] focus:border-[#b85c38]'
+                                            }`}
+                                    >
+                                        <option value="ALL">Semua Status Seleksi</option>
+                                        <option value="Pending">Pending</option>
+                                        <option value="Perbaikan">Perbaikan</option>
+                                        <option value="SIAP_TES">Siap Tes &amp; Wawancara</option>
+                                        <option value="Diterima">Diterima</option>
+                                        <option value="Ditolak">Ditolak</option>
+                                    </select>
+                                    <ChevronDown className="w-4 h-4 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none opacity-70" />
+                                </div>
+
+                                <div className="relative">
+                                    <select
+                                        value={reregFilter}
+                                        onChange={(e) => setReregFilter(e.target.value)}
+                                        aria-label="Filter Status Daftar Ulang"
+                                        className={`appearance-none pl-3.5 pr-8 py-2.5 text-xs sm:text-sm font-bold rounded-xl border outline-none cursor-pointer ${isDarkMode
+                                            ? 'bg-gray-950/80 border-gray-700 text-gray-100 focus:border-indigo-500'
+                                            : 'bg-white border-[#cbb7a2] text-[#1f1410] focus:border-[#b85c38]'
+                                            }`}
+                                    >
+                                        <option value="ALL">Semua Daftar Ulang</option>
+                                        <option value="MENUNGGU">Menunggu Verifikasi DU ({stats.reregWaiting})</option>
+                                        <option value="TERVERIFIKASI">Terverifikasi DU ({stats.reregVerified})</option>
+                                        <option value="PERBAIKAN">Perbaikan DU ({stats.reregRevision})</option>
+                                        <option value="BELUM">Diterima - Belum DU ({stats.reregNotYet})</option>
+                                    </select>
+                                    <ChevronDown className="w-4 h-4 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none opacity-70" />
+                                </div>
+
+                                <div className="relative">
+                                    <select
+                                        value={majorFilter}
+                                        onChange={(e) => setMajorFilter(e.target.value)}
+                                        aria-label="Filter Jurusan"
+                                        className={`appearance-none pl-3.5 pr-8 py-2.5 text-xs sm:text-sm font-bold rounded-xl border outline-none cursor-pointer ${isDarkMode
+                                            ? 'bg-gray-950/80 border-gray-700 text-gray-100 focus:border-indigo-500'
+                                            : 'bg-white border-[#cbb7a2] text-[#1f1410] focus:border-[#b85c38]'
+                                            }`}
+                                    >
+                                        <option value="ALL">Semua Jurusan</option>
+                                        {MAJOR_OPTIONS.map((m) => (
+                                            <option key={m} value={m}>{m}</option>
+                                        ))}
+                                    </select>
+                                    <ChevronDown className="w-4 h-4 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none opacity-70" />
+                                </div>
+
+                                <div className="relative">
+                                    <select
+                                        value={pathFilter}
+                                        onChange={(e) => setPathFilter(e.target.value)}
+                                        aria-label="Filter Jalur"
+                                        className={`appearance-none pl-3.5 pr-8 py-2.5 text-xs sm:text-sm font-bold rounded-xl border outline-none cursor-pointer ${isDarkMode
+                                            ? 'bg-gray-950/80 border-gray-700 text-gray-100 focus:border-indigo-500'
+                                            : 'bg-white border-[#cbb7a2] text-[#1f1410] focus:border-[#b85c38]'
+                                            }`}
+                                    >
+                                        <option value="ALL">Semua Jalur</option>
+                                        <option value="Reguler">Reguler</option>
+                                        <option value="Prestasi">Prestasi</option>
+                                    </select>
+                                    <ChevronDown className="w-4 h-4 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none opacity-70" />
+                                </div>
+
+                                {hasActiveFilters && (
+                                    <button
+                                        type="button"
+                                        onClick={resetFilters}
+                                        className={`flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold border transition-all ${isDarkMode
+                                            ? 'bg-rose-950/60 hover:bg-rose-900/70 border-rose-700 text-rose-300'
+                                            : 'bg-rose-50 hover:bg-rose-100 border-rose-300 text-rose-800'
+                                            }`}
+                                    >
+                                        <RotateCcw className="w-3.5 h-3.5" />
+                                        <span>Reset</span>
+                                    </button>
+                                )}
                             </div>
 
-                            {/* Filter Status Seleksi */}
-                            <div className="relative">
-                                <Filter className={`w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none ${isDarkMode ? 'text-gray-400' : 'text-[#5c4337]'}`} />
-                                <select
-                                    value={statusFilter}
-                                    onChange={(e) => setStatusFilter(e.target.value)}
-                                    aria-label="Filter Status Seleksi"
-                                    className={`appearance-none pl-8 pr-8 py-2.5 text-xs sm:text-sm font-bold rounded-xl border outline-none cursor-pointer ${isDarkMode
-                                        ? 'bg-gray-950/80 border-gray-700 text-gray-100 focus:border-indigo-500'
-                                        : 'bg-white border-[#cbb7a2] text-[#1f1410] focus:border-[#b85c38]'
-                                        }`}
-                                >
-                                    <option value="ALL">Semua Status Seleksi</option>
-                                    <option value="Pending">⏳ Pending</option>
-                                    <option value="Perbaikan">⚠️ Perbaikan</option>
-                                    <option value="SIAP_TES">📝 Siap Tes &amp; Wawancara</option>
-                                    <option value="Diterima">✅ Diterima</option>
-                                    <option value="Ditolak">❌ Ditolak</option>
-                                </select>
-                                <ChevronDown className="w-4 h-4 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none opacity-70" />
-                            </div>
-
-                            {/* Filter Daftar Ulang */}
-                            <div className="relative">
-                                <select
-                                    value={reregFilter}
-                                    onChange={(e) => setReregFilter(e.target.value)}
-                                    aria-label="Filter Status Daftar Ulang"
-                                    className={`appearance-none pl-3.5 pr-8 py-2.5 text-xs sm:text-sm font-bold rounded-xl border outline-none cursor-pointer ${isDarkMode
-                                        ? 'bg-gray-950/80 border-gray-700 text-gray-100 focus:border-indigo-500'
-                                        : 'bg-white border-[#cbb7a2] text-[#1f1410] focus:border-[#b85c38]'
-                                        }`}
-                                >
-                                    <option value="ALL">Semua Daftar Ulang</option>
-                                    <option value="MENUNGGU">⏳ Menunggu Verifikasi DU ({stats.reregWaiting})</option>
-                                    <option value="TERVERIFIKASI">✅ Terverifikasi DU ({stats.reregVerified})</option>
-                                    <option value="PERBAIKAN">⚠️ Perbaikan DU ({stats.reregRevision})</option>
-                                    <option value="BELUM">❗ Diterima - Belum DU ({stats.reregNotYet})</option>
-                                </select>
-                                <ChevronDown className="w-4 h-4 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none opacity-70" />
-                            </div>
-
-                            {/* Filter Jurusan */}
-                            <div className="relative">
-                                <select
-                                    value={majorFilter}
-                                    onChange={(e) => setMajorFilter(e.target.value)}
-                                    aria-label="Filter Jurusan"
-                                    className={`appearance-none pl-3.5 pr-8 py-2.5 text-xs sm:text-sm font-bold rounded-xl border outline-none cursor-pointer ${isDarkMode
-                                        ? 'bg-gray-950/80 border-gray-700 text-gray-100 focus:border-indigo-500'
-                                        : 'bg-white border-[#cbb7a2] text-[#1f1410] focus:border-[#b85c38]'
-                                        }`}
-                                >
-                                    <option value="ALL">Semua Jurusan</option>
-                                    {MAJOR_OPTIONS.map((m) => (
-                                        <option key={m} value={m}>{m}</option>
-                                    ))}
-                                </select>
-                                <ChevronDown className="w-4 h-4 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none opacity-70" />
-                            </div>
-
-                            {/* Filter Jalur */}
-                            <div className="relative">
-                                <select
-                                    value={pathFilter}
-                                    onChange={(e) => setPathFilter(e.target.value)}
-                                    aria-label="Filter Jalur"
-                                    className={`appearance-none pl-3.5 pr-8 py-2.5 text-xs sm:text-sm font-bold rounded-xl border outline-none cursor-pointer ${isDarkMode
-                                        ? 'bg-gray-950/80 border-gray-700 text-gray-100 focus:border-indigo-500'
-                                        : 'bg-white border-[#cbb7a2] text-[#1f1410] focus:border-[#b85c38]'
-                                        }`}
-                                >
-                                    <option value="ALL">Semua Jalur</option>
-                                    <option value="Reguler">Reguler</option>
-                                    <option value="Prestasi">Prestasi</option>
-                                </select>
-                                <ChevronDown className="w-4 h-4 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none opacity-70" />
-                            </div>
-
-                            {hasActiveFilters && (
-                                <button
-                                    type="button"
-                                    onClick={resetFilters}
-                                    className={`flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold border transition-all ${isDarkMode
-                                        ? 'bg-rose-950/60 hover:bg-rose-900/70 border-rose-700 text-rose-300'
-                                        : 'bg-rose-50 hover:bg-rose-100 border-rose-300 text-rose-800'
-                                        }`}
-                                >
-                                    <RotateCcw className="w-3.5 h-3.5" />
-                                    <span>Reset</span>
-                                </button>
-                            )}
-                        </div>
-
-                        <div className="flex items-center gap-2 text-xs sm:text-sm self-end xl:self-auto">
-                            <span className={`px-3.5 py-2 rounded-xl border font-semibold ${isDarkMode
-                                ? 'bg-gray-950/60 border-gray-800 text-gray-300'
-                                : 'bg-[#f7f1ea] border-[#d6c5b3] text-[#4a352b]'
-                                }`}>
-                                Menampilkan: <strong className={isDarkMode ? 'text-white' : 'text-[#1f1410]'}>{filteredApplicants.length}</strong> dari {applicants.length} data
-                            </span>
-                        </div>
-                    </div>
-
-                    {isLoading ? (
-                        <div className="py-20 flex flex-col items-center justify-center text-center">
-                            <div className="w-10 h-10 border-4 border-[#b85c38] border-t-transparent rounded-full animate-spin mb-3"></div>
-                            <p className="font-semibold text-sm">Memuat data pendaftar...</p>
-                        </div>
-                    ) : filteredApplicants.length === 0 ? (
-                        <div className="py-16 text-center space-y-3">
-                            <p className="font-semibold text-sm">Tidak ada pendaftar yang cocok dengan kriteria filter saat ini.</p>
-                            {hasActiveFilters && (
-                                <button
-                                    type="button"
-                                    onClick={resetFilters}
-                                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-[#b85c38] hover:bg-[#a04d2c] text-white"
-                                >
-                                    <RotateCcw className="w-4 h-4" />
-                                    Reset Semua Filter
-                                </button>
-                            )}
-                        </div>
-                    ) : (
-                        <div className={`overflow-x-auto rounded-2xl border ${isDarkMode ? 'border-gray-800' : 'border-[#d6c5b3]'}`}>
-                            <table className="w-full text-left border-collapse min-w-[1160px]">
-                                <thead>
-                                    <tr className={`border-b-2 text-xs sm:text-[13px] uppercase tracking-wider font-extrabold ${isDarkMode
-                                        ? 'bg-gray-950 text-gray-300 border-gray-800'
-                                        : 'bg-[#efe4d6] text-[#2b1d18] border-[#d1bfa9]'
+                            <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm self-end xl:self-auto">
+                                {selectedIds.length > 0 && (
+                                    <span className={`px-3.5 py-2 rounded-xl border font-extrabold ${isDarkMode
+                                        ? 'bg-teal-950/70 border-teal-600 text-teal-300'
+                                        : 'bg-emerald-50 border-emerald-400 text-emerald-900'
                                         }`}>
-                                        <th className="p-4 pl-4 w-12">No</th>
-                                        <th className="p-4">Nama &amp; Kontak</th>
-                                        <th className="p-4">NISN &amp; Tgl Lahir</th>
-                                        <th className="p-4">Pilihan Jurusan</th>
-                                        <th className="p-4">Berkas &amp; Daftar Ulang</th>
-                                        <th className="p-4 pr-4 w-80">Status &amp; Tindakan</th>
-                                    </tr>
-                                </thead>
-                                <tbody className={`divide-y text-sm ${isDarkMode ? 'divide-gray-800' : 'divide-[#e6d9ca]'}`}>
-                                    {filteredApplicants.map((app, index) => (
-                                        <tr
-                                            key={app.id}
-                                            className={`transition-colors duration-150 ${isDarkMode
-                                                ? 'bg-gray-900/40 hover:bg-gray-800/70'
-                                                : 'bg-white hover:bg-[#faf4ec]'
-                                                }`}
-                                        >
-                                            <td className={`p-4 pl-4 font-mono text-sm font-bold ${isDarkMode ? 'text-gray-400' : 'text-[#5c4337]'}`}>
-                                                {index + 1}
-                                            </td>
+                                        Terpilih: <strong>{selectedIds.length}</strong> peserta
+                                    </span>
+                                )}
+                                <span className={`px-3.5 py-2 rounded-xl border font-semibold ${isDarkMode
+                                    ? 'bg-gray-950/60 border-gray-800 text-gray-300'
+                                    : 'bg-[#f7f1ea] border-[#d6c5b3] text-[#4a352b]'
+                                    }`}>
+                                    Menampilkan: <strong className={isDarkMode ? 'text-white' : 'text-[#1f1410]'}>{filteredApplicants.length}</strong> dari {applicants.length} data
+                                </span>
+                            </div>
+                        </div>
 
-                                            <td className="p-4">
-                                                <div className={`font-extrabold text-base tracking-tight ${isDarkMode ? 'text-white' : 'text-[#1f1410]'}`}>
-                                                    {app.full_name}
-                                                </div>
-                                                <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                                                    <span className={`font-mono text-xs font-bold ${isDarkMode ? 'text-amber-300' : 'text-[#3d291e]'}`}>
-                                                        {app.registration_number}
-                                                    </span>
-                                                    <span className={isDarkMode ? 'text-gray-600' : 'text-[#cbb7a2]'}>&bull;</span>
-                                                    <a
-                                                        href={`https://wa.me/${app.phone}`}
-                                                        target="_blank"
-                                                        rel="noreferrer"
-                                                        className="text-xs font-bold text-emerald-800 dark:text-emerald-400 hover:underline flex items-center gap-1"
-                                                    >
-                                                        {app.phone || '-'}
-                                                        <ExternalLink className="w-3 h-3" />
-                                                    </a>
-                                                    {app.registration_path === 'Prestasi' ? (
-                                                        <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 dark:bg-amber-500/20 dark:text-amber-300 border border-amber-300 dark:border-amber-500/30 flex items-center gap-1">
-                                                            <Award className="w-3 h-3" /> Prestasi
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-stone-100 text-stone-800 dark:bg-gray-800 dark:text-gray-300 border border-stone-300 dark:border-gray-700">
-                                                            Reguler
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <div className={`text-xs font-medium mt-1.5 ${isDarkMode ? 'text-gray-300' : 'text-[#4a352b]'}`}>
-                                                    SMP: <span className="font-semibold">{app.asal_sekolah || '-'}</span>
-                                                </div>
-                                            </td>
+                        {isLoading ? (
+                            <div className="py-20 flex flex-col items-center justify-center text-center">
+                                <div className="w-10 h-10 border-4 border-[#b85c38] border-t-transparent rounded-full animate-spin mb-3"></div>
+                                <p className="font-semibold text-sm">Memuat data pendaftar...</p>
+                            </div>
+                        ) : filteredApplicants.length === 0 ? (
+                            <div className="py-16 text-center space-y-3">
+                                <p className="font-semibold text-sm">Tidak ada pendaftar yang cocok dengan kriteria filter saat ini.</p>
+                                {hasActiveFilters && (
+                                    <button
+                                        type="button"
+                                        onClick={resetFilters}
+                                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-[#b85c38] hover:bg-[#a04d2c] text-white"
+                                    >
+                                        <RotateCcw className="w-4 h-4" />
+                                        Reset Semua Filter
+                                    </button>
+                                )}
+                            </div>
+                        ) : (
+                            <div className={`overflow-x-auto rounded-2xl border ${isDarkMode ? 'border-gray-800' : 'border-[#d6c5b3]'}`}>
+                                <table className="w-full text-left border-collapse min-w-[1200px]">
+                                    <thead>
+                                        <tr className={`border-b-2 text-xs sm:text-[13px] uppercase tracking-wider font-extrabold ${isDarkMode
+                                            ? 'bg-gray-950 text-gray-300 border-gray-800'
+                                            : 'bg-[#efe4d6] text-[#2b1d18] border-[#d1bfa9]'
+                                            }`}>
+                                            <th className="p-4 pl-4 w-10">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isAllFilteredSelected}
+                                                    ref={(el) => {
+                                                        if (el) el.indeterminate = isSomeFilteredSelected;
+                                                    }}
+                                                    onChange={handleToggleSelectAll}
+                                                    title="Pilih semua peserta yang ditampilkan"
+                                                    className="w-4 h-4 accent-[#b85c38] dark:accent-teal-500 rounded cursor-pointer"
+                                                />
+                                            </th>
+                                            <th className="p-4 w-12">No</th>
+                                            <th className="p-4">Nama &amp; Kontak</th>
+                                            <th className="p-4">NISN &amp; Tgl Lahir</th>
+                                            <th className="p-4">Pilihan Jurusan</th>
+                                            <th className="p-4">Berkas &amp; Daftar Ulang</th>
+                                            <th className="p-4 pr-4 w-84">Status &amp; Tindakan</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className={`divide-y text-sm ${isDarkMode ? 'divide-gray-800' : 'divide-[#e6d9ca]'}`}>
+                                        {filteredApplicants.map((app, index) => {
+                                            const isRowSelected = selectedIds.includes(app.id);
+                                            return (
+                                                <tr
+                                                    key={app.id}
+                                                    className={`transition-colors duration-150 ${isRowSelected
+                                                        ? isDarkMode
+                                                            ? 'bg-teal-950/45'
+                                                            : 'bg-amber-100/75'
+                                                        : isDarkMode
+                                                            ? 'bg-gray-900/40 hover:bg-gray-800/70'
+                                                            : 'bg-white hover:bg-[#faf4ec]'
+                                                        }`}
+                                                >
+                                                    <td className="p-4 pl-4">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={isRowSelected}
+                                                            onChange={() => handleToggleSelectRow(app.id)}
+                                                            aria-label={`Pilih ${app.full_name}`}
+                                                            className="w-4 h-4 accent-[#b85c38] dark:accent-teal-500 rounded cursor-pointer"
+                                                        />
+                                                    </td>
 
-                                            <td className="p-4">
-                                                <div className={`font-mono text-sm font-bold ${isDarkMode ? 'text-gray-100' : 'text-[#1f1410]'}`}>
-                                                    {app.nisn || '-'}
-                                                </div>
-                                                <div className={`text-xs font-medium mt-1 ${isDarkMode ? 'text-gray-300' : 'text-[#4a352b]'}`}>
-                                                    {app.tanggal_lahir ? new Date(app.tanggal_lahir).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
-                                                </div>
-                                            </td>
+                                                    <td className={`p-4 font-mono text-sm font-bold ${isDarkMode ? 'text-gray-400' : 'text-[#5c4337]'}`}>
+                                                        {index + 1}
+                                                    </td>
 
-                                            <td className="p-4 space-y-1.5">
-                                                <div className={`text-sm font-bold ${isDarkMode ? 'text-gray-100' : 'text-[#1f1410]'}`}>
-                                                    1. {app.school_choice}
-                                                </div>
-                                                {app.school_choice_2 && (
-                                                    <div className={`text-xs font-medium ${isDarkMode ? 'text-gray-300' : 'text-[#4a352b]'}`}>
-                                                        2. {app.school_choice_2}
-                                                    </div>
-                                                )}
-                                                {app.accepted_major && (
-                                                    <div className="text-xs font-extrabold text-emerald-900 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-700 px-2.5 py-1 rounded-lg inline-flex items-center gap-1.5">
-                                                        <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-700 dark:text-emerald-400" />
-                                                        <span>Lulus: {app.accepted_major}</span>
-                                                    </div>
-                                                )}
-                                                {(app.test_date || app.interview_date) && (
-                                                    <div className="pt-1 space-y-1">
-                                                        {app.test_date && (
-                                                            <div className="text-xs font-semibold text-blue-900 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 px-2.5 py-1 rounded-lg flex items-center gap-1.5 w-fit">
-                                                                <CalendarClock className="w-3.5 h-3.5 shrink-0 text-blue-700 dark:text-blue-400" />
-                                                                <span>Tes: {app.test_date} {app.test_time ? `(${app.test_time})` : ''}</span>
-                                                            </div>
-                                                        )}
-                                                        {app.interview_date && (
-                                                            <div className="text-xs font-semibold text-teal-900 dark:text-teal-300 bg-teal-50 dark:bg-teal-950/50 border border-teal-200 dark:border-teal-800 px-2.5 py-1 rounded-lg flex items-center gap-1.5 w-fit">
-                                                                <Video className="w-3.5 h-3.5 shrink-0 text-teal-700 dark:text-teal-400" />
-                                                                <span>Wawancara: {app.interview_date} {app.interview_time ? `(${app.interview_time})` : ''}</span>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                )}
-                                            </td>
-
-                                            {/* Kolom Berkas Seleksi + Status Daftar Ulang */}
-                                            <td className="p-4 space-y-2.5">
-                                                <div className="flex flex-wrap gap-1.5">
-                                                    {app.document_kk && (
-                                                        <button
-                                                            onClick={() => handleViewDocument(app.document_kk!)}
-                                                            className={`px-2.5 py-1 rounded-lg font-extrabold text-xs border transition-all ${isDarkMode
-                                                                ? 'bg-gray-800 hover:bg-gray-700 text-gray-100 border-gray-700'
-                                                                : 'bg-[#f7f1ea] hover:bg-[#eadfd2] text-[#2b1d18] border-[#cbb7a2]'
-                                                                }`}
-                                                        >
-                                                            KK
-                                                        </button>
-                                                    )}
-                                                    {app.document_akta && (
-                                                        <button
-                                                            onClick={() => handleViewDocument(app.document_akta!)}
-                                                            className={`px-2.5 py-1 rounded-lg font-extrabold text-xs border transition-all ${isDarkMode
-                                                                ? 'bg-gray-800 hover:bg-gray-700 text-gray-100 border-gray-700'
-                                                                : 'bg-[#f7f1ea] hover:bg-[#eadfd2] text-[#2b1d18] border-[#cbb7a2]'
-                                                                }`}
-                                                        >
-                                                            Akta
-                                                        </button>
-                                                    )}
-                                                    {app.document_prestasi && (
-                                                        <button
-                                                            onClick={() => handleViewDocument(app.document_prestasi!)}
-                                                            className="px-2.5 py-1 rounded-lg font-extrabold text-xs bg-amber-100 hover:bg-amber-200 text-amber-950 dark:bg-amber-500/20 dark:hover:bg-amber-500/30 dark:text-amber-300 border border-amber-300 dark:border-amber-500/35 transition-all flex items-center gap-1"
-                                                        >
-                                                            <Award className="w-3 h-3 text-amber-700 dark:text-amber-400" />
-                                                            <span>Prestasi</span>
-                                                        </button>
-                                                    )}
-                                                </div>
-
-                                                {/* Info Status Daftar Ulang untuk siswa Diterima */}
-                                                {app.status === 'Diterima' && (
-                                                    <div className={`p-2.5 rounded-xl border space-y-1.5 ${app.rereg_status === 'Terverifikasi'
-                                                        ? isDarkMode ? 'bg-emerald-950/40 border-emerald-700/70' : 'bg-emerald-50 border-emerald-300'
-                                                        : app.rereg_status === 'Perbaikan Daftar Ulang'
-                                                            ? isDarkMode ? 'bg-amber-950/40 border-amber-700/70' : 'bg-amber-50 border-amber-300'
-                                                            : app.rereg_status === 'Menunggu Verifikasi'
-                                                                ? isDarkMode ? 'bg-blue-950/40 border-blue-700/70' : 'bg-blue-50 border-blue-300'
-                                                                : isDarkMode ? 'bg-gray-950/70 border-gray-800' : 'bg-[#faf4ec] border-[#d6c5b3]'
-                                                        }`}>
-                                                        <div className="flex items-center justify-between gap-1.5">
-                                                            <span className="text-[11px] font-extrabold uppercase tracking-wide">
-                                                                {app.rereg_status ? `DU: ${app.rereg_status}` : 'Belum Daftar Ulang'}
+                                                    <td className="p-4">
+                                                        <div className={`font-extrabold text-base tracking-tight ${isDarkMode ? 'text-white' : 'text-[#1f1410]'}`}>
+                                                            {app.full_name}
+                                                        </div>
+                                                        <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                                                            <span className={`font-mono text-xs font-bold ${isDarkMode ? 'text-amber-300' : 'text-[#3d291e]'}`}>
+                                                                {app.registration_number}
                                                             </span>
-                                                            {app.uniform_size && (
-                                                                <span className="text-[11px] font-mono font-extrabold px-1.5 py-0.5 rounded bg-black/10 dark:bg-white/10">
-                                                                    Baju {app.uniform_size}
+                                                            <span className={isDarkMode ? 'text-gray-600' : 'text-[#cbb7a2]'}>&bull;</span>
+                                                            <a
+                                                                href={`https://wa.me/${app.phone}`}
+                                                                target="_blank"
+                                                                rel="noreferrer"
+                                                                className="text-xs font-bold text-emerald-800 dark:text-emerald-400 hover:underline flex items-center gap-1"
+                                                            >
+                                                                {app.phone || '-'}
+                                                                <ExternalLink className="w-3 h-3" />
+                                                            </a>
+                                                            {app.registration_path === 'Prestasi' ? (
+                                                                <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 dark:bg-amber-500/20 dark:text-amber-300 border border-amber-300 dark:border-amber-500/30 flex items-center gap-1">
+                                                                    <Award className="w-3 h-3" /> Prestasi
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-stone-100 text-stone-800 dark:bg-gray-800 dark:text-gray-300 border border-stone-300 dark:border-gray-700">
+                                                                    Reguler
                                                                 </span>
                                                             )}
                                                         </div>
+                                                        <div className={`text-xs font-medium mt-1.5 ${isDarkMode ? 'text-gray-300' : 'text-[#4a352b]'}`}>
+                                                            SMP: <span className="font-semibold">{app.asal_sekolah || '-'}</span>
+                                                        </div>
+                                                    </td>
 
-                                                        {app.rereg_status ? (
-                                                            <div className="space-y-1.5">
-                                                                <p className="text-[11px] font-semibold opacity-85">
-                                                                    Bayar: <strong>{app.payment_scheme}</strong>
-                                                                </p>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => openReregModal(app)}
-                                                                    className="w-full py-1.5 px-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all"
-                                                                >
-                                                                    <ShieldCheck className="w-3.5 h-3.5" />
-                                                                    <span>Verifikasi DU &amp; Kuitansi</span>
-                                                                </button>
+                                                    <td className="p-4">
+                                                        <div className={`font-mono text-sm font-bold ${isDarkMode ? 'text-gray-100' : 'text-[#1f1410]'}`}>
+                                                            {app.nisn || '-'}
+                                                        </div>
+                                                        <div className={`text-xs font-medium mt-1 ${isDarkMode ? 'text-gray-300' : 'text-[#4a352b]'}`}>
+                                                            {app.tanggal_lahir ? new Date(app.tanggal_lahir).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
+                                                        </div>
+                                                    </td>
+
+                                                    <td className="p-4 space-y-1.5">
+                                                        <div className={`text-sm font-bold ${isDarkMode ? 'text-gray-100' : 'text-[#1f1410]'}`}>
+                                                            1. {app.school_choice}
+                                                        </div>
+                                                        {app.school_choice_2 && (
+                                                            <div className={`text-xs font-medium ${isDarkMode ? 'text-gray-300' : 'text-[#4a352b]'}`}>
+                                                                2. {app.school_choice_2}
                                                             </div>
-                                                        ) : (
-                                                            <a
-                                                                href={buildReregWhatsAppUrl(app)}
-                                                                target="_blank"
-                                                                rel="noreferrer"
-                                                                className="w-full py-1.5 px-2.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all"
-                                                            >
-                                                                <MessageCircle className="w-3.5 h-3.5" />
-                                                                <span>Ingatkan WA DU</span>
-                                                            </a>
                                                         )}
-                                                    </div>
-                                                )}
-                                            </td>
+                                                        {app.accepted_major && (
+                                                            <div className="text-xs font-extrabold text-emerald-900 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-700 px-2.5 py-1 rounded-lg inline-flex items-center gap-1.5">
+                                                                <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-700 dark:text-emerald-400" />
+                                                                <span>Lulus: {app.accepted_major}</span>
+                                                            </div>
+                                                        )}
+                                                        {app.interview_recommendation && (
+                                                            <div
+                                                                title={app.interview_notes ? `Catatan: ${app.interview_notes}` : undefined}
+                                                                className={`text-[11px] font-bold px-2 py-0.5 rounded-lg border inline-flex items-center gap-1 max-w-full cursor-help ${
+                                                                    app.interview_recommendation.includes('Pilihan 1')
+                                                                        ? 'bg-teal-50 text-teal-900 border-teal-300 dark:bg-teal-950/50 dark:text-teal-300 dark:border-teal-700'
+                                                                        : app.interview_recommendation.includes('Pilihan 2')
+                                                                        ? 'bg-blue-50 text-blue-900 border-blue-300 dark:bg-blue-950/50 dark:text-blue-300 dark:border-blue-700'
+                                                                        : app.interview_recommendation.includes('Tidak')
+                                                                        ? 'bg-rose-50 text-rose-900 border-rose-300 dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-700'
+                                                                        : 'bg-amber-50 text-amber-900 border-amber-300 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-700'
+                                                                }`}
+                                                            >
+                                                                <MessageCircle className="w-3 h-3 shrink-0 opacity-70" />
+                                                                <span className="truncate">Wawancara: {app.interview_recommendation}</span>
+                                                            </div>
+                                                        )}
+                                                        {(app.test_date || app.interview_date) && (
+                                                            <div className="pt-1 space-y-1">
+                                                                {app.test_date && (
+                                                                    <div className="text-xs font-semibold text-blue-900 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 px-2.5 py-1 rounded-lg flex items-center gap-1.5 w-fit">
+                                                                        <CalendarClock className="w-3.5 h-3.5 shrink-0 text-blue-700 dark:text-blue-400" />
+                                                                        <span>Tes: {app.test_date} {app.test_time ? `(${app.test_time})` : ''}</span>
+                                                                    </div>
+                                                                )}
+                                                                {app.interview_date && (
+                                                                    <div className="text-xs font-semibold text-teal-900 dark:text-teal-300 bg-teal-50 dark:bg-teal-950/50 border border-teal-200 dark:border-teal-800 px-2.5 py-1 rounded-lg flex items-center gap-1.5 w-fit">
+                                                                        <Video className="w-3.5 h-3.5 shrink-0 text-teal-700 dark:text-teal-400" />
+                                                                        <span>Wawancara: {app.interview_date} {app.interview_time ? `(${app.interview_time})` : ''}</span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </td>
 
-                                            {/* Kolom Status Seleksi & Aksi */}
-                                            <td className="p-4 pr-4 space-y-2.5">
-                                                <div className="relative">
-                                                    <select
-                                                        value={app.status}
-                                                        onChange={(e) => {
-                                                            const ns = e.target.value;
-                                                            if (ns === 'Diterima') {
-                                                                handleUpdateStatus(app.id, ns, app.accepted_major || app.school_choice);
-                                                            } else {
-                                                                handleUpdateStatus(app.id, ns);
-                                                            }
-                                                        }}
-                                                        className={`w-full appearance-none pl-3.5 pr-8 py-2 rounded-xl font-extrabold text-xs border outline-none cursor-pointer transition-all ${app.status === 'Diterima'
-                                                            ? 'bg-emerald-100 text-emerald-950 border-emerald-300 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/35'
-                                                            : app.status === 'Ditolak'
-                                                                ? 'bg-rose-100 text-rose-950 border-rose-300 dark:bg-rose-500/20 dark:text-rose-300 dark:border-rose-500/35'
-                                                                : app.status === 'Perbaikan'
-                                                                    ? 'bg-amber-100 text-amber-950 border-amber-300 dark:bg-amber-500/20 dark:text-amber-300 dark:border-amber-500/35'
-                                                                    : app.status.includes('Siap Tes')
-                                                                        ? 'bg-blue-100 text-blue-950 border-blue-300 dark:bg-blue-500/20 dark:text-blue-300 dark:border-blue-500/35'
-                                                                        : 'bg-yellow-100 text-yellow-950 border-yellow-300 dark:bg-yellow-500/20 dark:text-yellow-300 dark:border-yellow-500/35'
-                                                            }`}
-                                                    >
-                                                        <option value="Pending">⏳ Pending</option>
-                                                        <option value="Perbaikan">⚠️ Perbaikan</option>
-                                                        <option value="Siap Tes dan/atau Wawancara">📝 Siap Tes &amp; Wawancara</option>
-                                                        <option value="Diterima">✅ Diterima</option>
-                                                        <option value="Ditolak">❌ Ditolak</option>
-                                                    </select>
-                                                    <ChevronDown className="w-4 h-4 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none opacity-75" />
-                                                </div>
+                                                    <td className="p-4 space-y-2.5">
+                                                        <div className="flex flex-wrap gap-1.5">
+                                                            {app.document_kk && (
+                                                                <button
+                                                                    onClick={() => handleViewDocument(app.document_kk!)}
+                                                                    className={`px-2.5 py-1 rounded-lg font-extrabold text-xs border transition-all ${isDarkMode
+                                                                        ? 'bg-gray-800 hover:bg-gray-700 text-gray-100 border-gray-700'
+                                                                        : 'bg-[#f7f1ea] hover:bg-[#eadfd2] text-[#2b1d18] border-[#cbb7a2]'
+                                                                        }`}
+                                                                >
+                                                                    KK
+                                                                </button>
+                                                            )}
+                                                            {app.document_akta && (
+                                                                <button
+                                                                    onClick={() => handleViewDocument(app.document_akta!)}
+                                                                    className={`px-2.5 py-1 rounded-lg font-extrabold text-xs border transition-all ${isDarkMode
+                                                                        ? 'bg-gray-800 hover:bg-gray-700 text-gray-100 border-gray-700'
+                                                                        : 'bg-[#f7f1ea] hover:bg-[#eadfd2] text-[#2b1d18] border-[#cbb7a2]'
+                                                                        }`}
+                                                                >
+                                                                    Akta
+                                                                </button>
+                                                            )}
+                                                            {app.document_prestasi && (
+                                                                <button
+                                                                    onClick={() => handleViewDocument(app.document_prestasi!)}
+                                                                    className="px-2.5 py-1 rounded-lg font-extrabold text-xs bg-amber-100 hover:bg-amber-200 text-amber-950 dark:bg-amber-500/20 dark:hover:bg-amber-500/30 dark:text-amber-300 border border-amber-300 dark:border-amber-500/35 transition-all flex items-center gap-1"
+                                                                >
+                                                                    <Award className="w-3 h-3 text-amber-700 dark:text-amber-400" />
+                                                                    <span>Prestasi</span>
+                                                                </button>
+                                                            )}
+                                                        </div>
 
-                                                <div className="grid grid-cols-2 gap-1.5">
-                                                    <button
-                                                        onClick={() => openScheduleModal(app)}
-                                                        className="col-span-2 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg font-bold text-xs bg-blue-600 hover:bg-blue-700 text-white shadow-xs transition-all active:scale-95"
-                                                    >
-                                                        <Calendar className="w-3.5 h-3.5" />
-                                                        <span>Jadwal &amp; Jurusan</span>
-                                                    </button>
-                                                    <button
-                                                        onClick={() => openRevisionModal(app)}
-                                                        className="flex items-center justify-center gap-1 py-1.5 px-2.5 rounded-lg font-bold text-xs bg-amber-600 hover:bg-amber-700 text-white shadow-xs transition-all active:scale-95"
-                                                    >
-                                                        <AlertCircle className="w-3.5 h-3.5" />
-                                                        <span>Perbaikan</span>
-                                                    </button>
-                                                    <Link
-                                                        href={`/admin/wawancara/${app.id}`}
-                                                        target="_blank"
-                                                        className="flex items-center justify-center gap-1 py-1.5 px-2.5 rounded-lg font-bold text-xs bg-teal-600 hover:bg-teal-700 text-white shadow-xs transition-all active:scale-95 text-center"
-                                                    >
-                                                        <Video className="w-3.5 h-3.5" />
-                                                        <span>Wawancara</span>
-                                                    </Link>
-                                                    <button
-                                                        onClick={() => handleViewResults(app.id, app)}
-                                                        className="flex items-center justify-center gap-1 py-1.5 px-2.5 rounded-lg font-bold text-xs bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs transition-all active:scale-95"
-                                                    >
-                                                        <FileCheck2 className="w-3.5 h-3.5" />
-                                                        <span>Nilai Tes</span>
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleViewSnapshots(app.id)}
-                                                        className="flex items-center justify-center gap-1 py-1.5 px-2.5 rounded-lg font-bold text-xs bg-slate-700 hover:bg-slate-800 text-white shadow-xs transition-all active:scale-95"
-                                                    >
-                                                        <Camera className="w-3.5 h-3.5" />
-                                                        <span>Foto Ujian</span>
-                                                    </button>
-                                                </div>
-                                                {app.document_notes && (
-                                                    <p className="text-xs font-medium text-amber-950 dark:text-amber-300 mt-1.5 leading-snug bg-amber-100 dark:bg-amber-500/15 p-2 rounded-lg border border-amber-300 dark:border-amber-500/30">
-                                                        Catatan: {app.document_notes}
-                                                    </p>
-                                                )}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </div>
+                                                        {app.status === 'Diterima' && (
+                                                            <div className={`p-2.5 rounded-xl border space-y-1.5 ${app.rereg_status === 'Terverifikasi'
+                                                                ? isDarkMode ? 'bg-emerald-950/40 border-emerald-700/70' : 'bg-emerald-50 border-emerald-300'
+                                                                : app.rereg_status === 'Perbaikan Daftar Ulang'
+                                                                    ? isDarkMode ? 'bg-amber-950/40 border-amber-700/70' : 'bg-amber-50 border-amber-300'
+                                                                    : app.rereg_status === 'Menunggu Verifikasi'
+                                                                        ? isDarkMode ? 'bg-blue-950/40 border-blue-700/70' : 'bg-blue-50 border-blue-300'
+                                                                        : isDarkMode ? 'bg-gray-950/70 border-gray-800' : 'bg-[#faf4ec] border-[#d6c5b3]'
+                                                                }`}>
+                                                                <div className="flex items-center justify-between gap-1.5">
+                                                                    <span className="text-[11px] font-extrabold uppercase tracking-wide">
+                                                                        {app.rereg_status ? `DU: ${app.rereg_status}` : 'Belum Daftar Ulang'}
+                                                                    </span>
+                                                                    {app.uniform_size && (
+                                                                        <span className="text-[11px] font-mono font-extrabold px-1.5 py-0.5 rounded bg-black/10 dark:bg-white/10">
+                                                                            Baju {app.uniform_size}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+
+                                                                {app.rereg_status ? (
+                                                                    <div className="space-y-1.5">
+                                                                        <p className="text-[11px] font-semibold opacity-85">
+                                                                            Bayar: <strong>{app.payment_scheme}</strong>
+                                                                        </p>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => openReregModal(app)}
+                                                                            className="w-full py-1.5 px-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all"
+                                                                        >
+                                                                            <ShieldCheck className="w-3.5 h-3.5" />
+                                                                            <span>Verifikasi DU &amp; Kuitansi</span>
+                                                                        </button>
+                                                                    </div>
+                                                                ) : (
+                                                                    <a
+                                                                        href={buildReregWhatsAppUrl(app)}
+                                                                        target="_blank"
+                                                                        rel="noreferrer"
+                                                                        className="w-full py-1.5 px-2.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all"
+                                                                    >
+                                                                        <MessageCircle className="w-3.5 h-3.5" />
+                                                                        <span>Ingatkan WA DU</span>
+                                                                    </a>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </td>
+
+                                                    <td className="p-4 pr-4 space-y-2.5">
+                                                        <div className="relative">
+                                                            <select
+                                                                value={app.status}
+                                                                onChange={(e) => {
+                                                                    const ns = e.target.value;
+                                                                    if (ns === 'Diterima') {
+                                                                        handleUpdateStatus(app.id, ns, app.accepted_major || app.school_choice);
+                                                                    } else {
+                                                                        handleUpdateStatus(app.id, ns);
+                                                                    }
+                                                                }}
+                                                                className={`w-full appearance-none pl-3.5 pr-8 py-2 rounded-xl font-extrabold text-xs border outline-none cursor-pointer transition-all ${app.status === 'Diterima'
+                                                                    ? 'bg-emerald-100 text-emerald-950 border-emerald-300 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/35'
+                                                                    : app.status === 'Ditolak'
+                                                                        ? 'bg-rose-100 text-rose-950 border-rose-300 dark:bg-rose-500/20 dark:text-rose-300 dark:border-rose-500/35'
+                                                                        : app.status === 'Perbaikan'
+                                                                            ? 'bg-amber-100 text-amber-950 border-amber-300 dark:bg-amber-500/20 dark:text-amber-300 dark:border-amber-500/35'
+                                                                            : app.status.includes('Siap Tes')
+                                                                                ? 'bg-blue-100 text-blue-950 border-blue-300 dark:bg-blue-500/20 dark:text-blue-300 dark:border-blue-500/35'
+                                                                                : 'bg-yellow-100 text-yellow-950 border-yellow-300 dark:bg-yellow-500/20 dark:text-yellow-300 dark:border-yellow-500/35'
+                                                                    }`}
+                                                            >
+                                                                <option value="Pending">Pending</option>
+                                                                <option value="Perbaikan">Perbaikan</option>
+                                                                <option value="Siap Tes dan/atau Wawancara">Siap Tes &amp; Wawancara</option>
+                                                                <option value="Diterima">Diterima</option>
+                                                                <option value="Ditolak">Ditolak</option>
+                                                            </select>
+                                                            <ChevronDown className="w-4 h-4 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none opacity-75" />
+                                                        </div>
+
+                                                        <div className="grid grid-cols-2 gap-1.5">
+                                                            <button
+                                                                onClick={() => openScheduleModal(app)}
+                                                                className="flex items-center justify-center gap-1 py-2 px-2.5 rounded-lg font-bold text-xs bg-blue-600 hover:bg-blue-700 text-white shadow-xs transition-all active:scale-95"
+                                                            >
+                                                                <Calendar className="w-3.5 h-3.5 shrink-0" />
+                                                                <span>Jadwal &amp; Jurusan</span>
+                                                            </button>
+                                                            <AdminWhatsAppButton applicant={app} settings={siteSettings} />
+                                                            <button
+                                                                onClick={() => openRevisionModal(app)}
+                                                                className="flex items-center justify-center gap-1 py-1.5 px-2.5 rounded-lg font-bold text-xs bg-amber-600 hover:bg-amber-700 text-white shadow-xs transition-all active:scale-95"
+                                                            >
+                                                                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                                                                <span>Perbaikan</span>
+                                                            </button>
+                                                            <Link
+                                                                href={`/admin/wawancara/${app.id}`}
+                                                                target="_blank"
+                                                                className="flex items-center justify-center gap-1 py-1.5 px-2.5 rounded-lg font-bold text-xs bg-teal-600 hover:bg-teal-700 text-white shadow-xs transition-all active:scale-95 text-center"
+                                                            >
+                                                                <Video className="w-3.5 h-3.5 shrink-0" />
+                                                                <span>Wawancara</span>
+                                                            </Link>
+                                                            <button
+                                                                onClick={() => handleViewResults(app.id, app)}
+                                                                className="flex items-center justify-center gap-1 py-1.5 px-2.5 rounded-lg font-bold text-xs bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs transition-all active:scale-95"
+                                                            >
+                                                                <FileCheck2 className="w-3.5 h-3.5 shrink-0" />
+                                                                <span>Nilai Tes</span>
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleViewSnapshots(app.id)}
+                                                                className="flex items-center justify-center gap-1 py-1.5 px-2.5 rounded-lg font-bold text-xs bg-slate-700 hover:bg-slate-800 text-white shadow-xs transition-all active:scale-95"
+                                                            >
+                                                                <Camera className="w-3.5 h-3.5 shrink-0" />
+                                                                <span>Foto Ujian</span>
+                                                            </button>
+                                                        </div>
+                                                        {app.document_notes && (
+                                                            <p className="text-xs font-medium text-amber-950 dark:text-amber-300 mt-1.5 leading-snug bg-amber-100 dark:bg-amber-500/15 p-2 rounded-lg border border-amber-300 dark:border-amber-500/30">
+                                                                Catatan: {app.document_notes}
+                                                            </p>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Panel Rekap Nilai & Peringkat (tampil pada tab ranking) */}
+                {activeTab === 'ranking' && (
+                    <AdminRankingPanel onStatusChange={fetchApplicants} />
+                )}
             </div>
 
-            {/* MODAL BARU: VERIFIKASI DAFTAR ULANG & KUITANSI GOSISWA.COM */}
+            {/* FLOATING ACTION BAR: TINDAKAN MASSAL (JADWAL & STATUS) */}
+            <AdminBulkActionBar
+                selectedApplicants={selectedApplicantsSummary}
+                onClearSelection={() => setSelectedIds([])}
+                onSuccess={fetchApplicants}
+            />
+
+            {/* MODAL VERIFIKASI DAFTAR ULANG & KUITANSI GOSISWA.COM */}
             {reregModalOpen && selectedApp && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-sm p-4">
                     <div className={`w-full max-w-3xl p-6 sm:p-7 rounded-3xl shadow-2xl border ${isDarkMode ? 'bg-gray-900 border-gray-800 text-white' : 'bg-white border-[#cbb7a2] text-[#1f1410]'
@@ -1644,7 +1786,6 @@ export default function AdminDashboard() {
                             </button>
                         </div>
 
-                        {/* Ringkasan Pas Foto + Pembayaran + Seragam */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className={`p-4 rounded-2xl border flex flex-col items-center justify-center ${isDarkMode ? 'bg-gray-950/70 border-gray-800' : 'bg-[#faf4ec] border-[#d6c5b3]'}`}>
                                 {modalPasFotoUrl ? (
@@ -1693,7 +1834,6 @@ export default function AdminDashboard() {
                             </div>
                         </div>
 
-                        {/* Data Orang Tua & Kesehatan */}
                         <div className={`p-4 rounded-2xl border grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs ${isDarkMode ? 'bg-gray-950/50 border-gray-800' : 'bg-gray-50 border-gray-200'}`}>
                             <div>
                                 <p className="font-extrabold uppercase opacity-70 mb-1">Data Ayah &amp; Ibu</p>
@@ -1707,7 +1847,6 @@ export default function AdminDashboard() {
                             </div>
                         </div>
 
-                        {/* Tombol Buka 4 Dokumen Daftar Ulang */}
                         <div>
                             <p className="text-xs font-extrabold uppercase tracking-wide mb-2">Tinjau Lampiran Berkas Daftar Ulang:</p>
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
@@ -1754,14 +1893,13 @@ export default function AdminDashboard() {
                             </div>
                         </div>
 
-                        {/* Keputusan Verifikasi Panitia */}
                         <div className={`p-4 rounded-2xl border space-y-3 ${isDarkMode ? 'bg-gray-950/70 border-gray-800' : 'bg-[#fdf6ee] border-[#cbb7a2]'}`}>
                             <label className="block text-xs sm:text-sm font-extrabold">Keputusan Verifikasi Daftar Ulang:</label>
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                                 {[
-                                    { value: 'Menunggu Verifikasi', label: '⏳ Menunggu Verifikasi' },
-                                    { value: 'Perbaikan Daftar Ulang', label: '⚠️ Minta Perbaikan DU' },
-                                    { value: 'Terverifikasi', label: '✅ Terverifikasi (Sah)' },
+                                    { value: 'Menunggu Verifikasi', label: 'Menunggu Verifikasi' },
+                                    { value: 'Perbaikan Daftar Ulang', label: 'Minta Perbaikan DU' },
+                                    { value: 'Terverifikasi', label: 'Terverifikasi (Sah)' },
                                 ].map((opt) => (
                                     <button
                                         key={opt.value}
@@ -1997,7 +2135,7 @@ export default function AdminDashboard() {
 
                         <div ref={reportRef} className="print:text-black">
                             <div className="hidden print:block text-center mb-8 border-b-2 border-black pb-4">
-                                <h1 className="text-2xl font-bold uppercase">SMK KH. A. WAHAB MUHSIN</h1>
+                                <h1 className="text-2xl font-bold uppercase">{siteSettings?.school_name || 'SMK KH. A. WAHAB MUHSIN'}</h1>
                                 <h2 className="text-lg font-semibold">Laporan Hasil Asesmen</h2>
                                 <p className="text-sm mt-2">Nama: <strong>{selectedApp?.full_name}</strong> | NISN: {selectedApp?.nisn}</p>
                             </div>
@@ -2091,4 +2229,6 @@ export default function AdminDashboard() {
             )}
         </main>
     );
+
+
 }

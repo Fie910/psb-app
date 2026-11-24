@@ -2,33 +2,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth/server';
 
-const adminPageMiddleware = auth.middleware({
+const neonAuthMiddleware = auth.middleware({
     loginUrl: '/login',
 });
 
-export default async function proxy(request: NextRequest) {
-    const { pathname } = request.nextUrl;
+export async function proxy(request: NextRequest) {
+    const response = await neonAuthMiddleware(request);
 
-    if (pathname.startsWith('/api/admin')) {
-        try {
-            const { data: sessionData, error } = await auth.getSession();
-            if (error || !sessionData?.session || !sessionData?.user) {
-                return NextResponse.json(
-                    { error: 'Unauthorized: Akses ditolak. Silakan login terlebih dahulu.' },
-                    { status: 401 }
-                );
-            }
-            return NextResponse.next();
-        } catch {
-            return NextResponse.json(
-                { error: 'Unauthorized: Gagal memverifikasi autentikasi.' },
-                { status: 401 }
-            );
-        }
+    if (
+        request.nextUrl.pathname.startsWith('/api/admin') &&
+        response &&
+        (response.status === 307 || response.status === 302)
+    ) {
+        return NextResponse.json(
+            { error: 'Unauthorized: Sesi panitia tidak valid atau telah berakhir.' },
+            { status: 401 }
+        );
     }
 
-    return adminPageMiddleware(request);
+    return response;
+
+
 }
+
+export default proxy;
 
 export const config = {
     matcher: ['/admin/:path*', '/api/admin/:path*'],

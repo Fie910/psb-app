@@ -292,6 +292,26 @@ const INCOME_OPTIONS = ['Tidak Berpenghasilan', '< Rp 1.000.000', 'Rp 1.000.000 
         }
     };
 
+    const refreshPasFoto = async () => {
+        if (!applicant?.nisn || !existingRereg?.doc_pas_foto) return;
+        try {
+            const res = await fetch('/api/daftar-ulang/document', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    nisn: applicant.nisn,
+                    tanggal_lahir: applicant.tanggal_lahir,
+                    key: existingRereg.doc_pas_foto,
+                }),
+            });
+            if (!res.ok) return;
+            const data = await res.json();
+            if (data.viewUrl) setPasFotoUrl(data.viewUrl);
+        } catch {
+            // Abaikan kegagalan refresh; biarkan placeholder tampil
+        }
+    };
+
     const uploadSingleFile = async (file: File, docType: string, studentName: string): Promise<string> => {
         let fileToUpload: File | Blob = file;
         let contentType = file.type || 'application/octet-stream';
@@ -695,12 +715,13 @@ Orang Tua / Wali Siswa                          Calon Peserta Didik Baru,( _____
                                         <img
                                             src={pasFotoUrl}
                                             alt={`Pas Foto ${applicant.full_name}`}
+                                            onError={refreshPasFoto}
                                             className="w-28 h-36 object-cover rounded-xl border-2 border-[#b85c38] shadow-md"
                                         />
                                     ) : (
-                                        <div className="w-28 h-36 rounded-xl bg-gray-200 dark:bg-gray-800 flex items-center justify-center text-xs font-bold text-gray-500">
-                                            Pas Foto 3x4
-                                        </div>
+                                    <div className="w-28 h-36 rounded-xl bg-gray-200 dark:bg-gray-800 flex items-center justify-center text-xs font-bold text-gray-500">
+                                        Pas Foto 3x4
+                                    </div>
                                     )}
                                     <span className="mt-2.5 text-xs font-mono font-extrabold px-2.5 py-0.5 rounded-full bg-[#b85c38]/15 text-[#8f3f20] dark:bg-teal-500/20 dark:text-teal-300">
                                         {applicant.registration_number}
