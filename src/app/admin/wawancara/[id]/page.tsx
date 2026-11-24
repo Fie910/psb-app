@@ -93,6 +93,7 @@ export default function AdminWawancaraRoomPage({ params }: { params: Promise<{ i
     const [interviewNotes, setInterviewNotes] = useState<string>('');
     const [jaasToken, setJaasToken] = useState<string>('');
     const [jaasAppId, setJaasAppId] = useState<string>('');
+    const [jaasError, setJaasError] = useState<string>('');
     const [virtualBgUrl, setVirtualBgUrl] = useState<string>('');
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [isSaving, setIsSaving] = useState<boolean>(false);
@@ -152,17 +153,23 @@ export default function AdminWawancaraRoomPage({ params }: { params: Promise<{ i
                 const tokenRes = await fetch('/api/jaas-token', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
                     body: JSON.stringify({
                         roomName,
                         userName: 'Panitia Wawancara',
                         isModerator: true,
                     }),
                 });
-                const tokenData = await tokenRes.json();
+                const tokenData = await tokenRes.json().catch(() => ({}));
                 if (tokenRes.ok && tokenData.token) {
                     setJaasToken(tokenData.token);
+                    if (tokenData.appId) {
+                        setJaasAppId(tokenData.appId);
+                    }
                 } else {
-                    console.error('Gagal mengambil token JaaS:', tokenData.error);
+                    const errMsg = tokenData.error || `HTTP ${tokenRes.status}: Gagal memuat token JaaS`;
+                    console.error('Gagal mengambil token JaaS:', errMsg);
+                    setJaasError(errMsg);
                 }
 
                 // 3. Ambil Rubrik Pertanyaan Wawancara
@@ -406,7 +413,12 @@ export default function AdminWawancaraRoomPage({ params }: { params: Promise<{ i
                     ) : (
                         <div className="h-full flex flex-col items-center justify-center p-6 text-center text-gray-400">
                             <p className="mb-2 text-yellow-400 font-semibold">Gagal memuat token Jitsi Moderator.</p>
-                            <p className="text-xs">Pastikan kunci API JaaS di .env.local telah terkonfigurasi dengan benar.</p>
+                            {jaasError && (
+                                <p className="text-xs text-red-400 bg-red-950/40 border border-red-800/60 rounded-lg px-3 py-1.5 mb-2 max-w-md break-words">
+                                    {jaasError}
+                                </p>
+                            )}
+                            <p className="text-xs">Pastikan kunci API JaaS (JAAS_APP_ID, JAAS_PRIVATE_KEY, JAAS_KID) telah terkonfigurasi pada environment produksi.</p>
                         </div>
                     )}
                 </div>
