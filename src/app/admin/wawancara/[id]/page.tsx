@@ -1,4 +1,4 @@
-//src/app/admin/wawancara/[id]/page.tsx
+﻿//src/app/admin/wawancara/[id]/page.tsx
 'use client';
 
 import { useState, useEffect, use } from 'react';
@@ -92,6 +92,7 @@ export default function AdminWawancaraRoomPage({ params }: { params: Promise<{ i
     const [recommendation, setRecommendation] = useState<string>('');
     const [interviewNotes, setInterviewNotes] = useState<string>('');
     const [jaasToken, setJaasToken] = useState<string>('');
+    const [virtualBgUrl, setVirtualBgUrl] = useState<string>('');
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [isSaving, setIsSaving] = useState<boolean>(false);
     const [error, setError] = useState<string>('');
@@ -102,6 +103,18 @@ export default function AdminWawancaraRoomPage({ params }: { params: Promise<{ i
             try {
                 setIsLoading(true);
                 setError('');
+
+                // 0. Ambil Pengaturan Sekolah (Virtual Background)
+                try {
+                    const settingsRes = await fetch('/api/settings');
+                    const settingsData = await settingsRes.json();
+                    if (settingsData.settings?.virtual_background_url) {
+                        const origin = typeof window !== 'undefined' ? window.location.origin : '';
+                        setVirtualBgUrl(`${origin}/api/virtual-background?v=${encodeURIComponent(settingsData.settings.virtual_background_url)}`);
+                    }
+                } catch (sErr) {
+                    console.warn('Gagal memuat pengaturan background:', sErr);
+                }
 
                 // 1. Ambil Data Peserta & Hasil Ujian
                 const appRes = await fetch(`/api/admin/applicants/${applicantId}`);
@@ -335,13 +348,37 @@ export default function AdminWawancaraRoomPage({ params }: { params: Promise<{ i
                                     startWithVideoMuted: false,
                                     prejoinPageEnabled: false,
                                     disableDeepLinking: true,
+                                    disableVirtualBackground: false,
+                                    customVirtualBackgrounds: (virtualBgUrl ? [{ id: 'school-custom-bg', src: virtualBgUrl, title: 'Background Sekolah' }] : []) as any,
                                 }}
                                 interfaceConfigOverwrite={{
                                     DISABLE_JOIN_LEAVE_NOTIFICATIONS: true,
                                     MOBILE_APP_PROMO: false,
                                 }}
-                                onApiReady={() => {
+                                onApiReady={(externalApi) => {
                                     console.log('Jitsi Moderator API ready');
+                                    if (virtualBgUrl) {
+                                        const applySchoolBackground = () => {
+                                            try {
+                                                externalApi.executeCommand('setVirtualBackground', true, virtualBgUrl);
+                                            } catch (err) {
+                                                console.warn('Gagal menerapkan virtual background otomatis:', err);
+                                            }
+                                        };
+
+                                        applySchoolBackground();
+
+                                        externalApi.addListener('videoConferenceJoined', () => {
+                                            applySchoolBackground();
+                                            setTimeout(applySchoolBackground, 1500);
+                                        });
+
+                                        externalApi.addListener('trackAdded', (track: { type?: string; local?: boolean }) => {
+                                            if (track?.type === 'video' && track?.local) {
+                                                setTimeout(applySchoolBackground, 800);
+                                            }
+                                        });
+                                    }
                                 }}
                                 getIFrameRef={(iframeRef) => {
                                     iframeRef.style.height = '100%';

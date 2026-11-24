@@ -4,7 +4,8 @@
             "AllowedOrigins": [
                 "http://localhost:3000",
                 "https://psb.smk-khawm.workers.dev",
-                "https://pmb.smk-khawahabmuhsin.sch.id"
+                "https://pmb.smk-khawahabmuhsin.sch.id",
+                "https://8x8.vc"
             ],
             "AllowedMethods": [
                 "PUT",

@@ -1,7 +1,7 @@
 //src/app/wawancara/page.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { JaaSMeeting } from '@jitsi/react-sdk';
 import Link from 'next/link';
 
@@ -14,6 +14,24 @@ export default function WawancaraPage() {
     const [isVerified, setIsVerified] = useState(false);
     const [applicantData, setApplicantData] = useState<{ full_name: string, registration_number: string } | null>(null);
     const [jaasToken, setJaasToken] = useState('');
+    const [virtualBgUrl, setVirtualBgUrl] = useState<string>('');
+
+    useEffect(() => {
+        async function fetchSettings() {
+            try {
+                const sRes = await fetch('/api/settings');
+                const sData = await sRes.json();
+                if (sData.settings?.virtual_background_url) {
+                    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+                    setVirtualBgUrl(`${origin}/api/virtual-background?v=${encodeURIComponent(sData.settings.virtual_background_url)}`);
+                }
+            } catch (err) {
+                console.warn('Gagal memuat setting background:', err);
+            }
+        }
+        fetchSettings();
+    }, []);
+
     const handleVerify = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
@@ -79,6 +97,8 @@ export default function WawancaraPage() {
                                 startWithVideoMuted: false,
                                 prejoinPageEnabled: true,
                                 disableDeepLinking: true,
+                                disableVirtualBackground: false,
+                                customVirtualBackgrounds: (virtualBgUrl ? [{ id: 'school-custom-bg', src: virtualBgUrl, title: 'Background Sekolah' }] : []) as any,
                             }}
                             interfaceConfigOverwrite={{
                                 DISABLE_JOIN_LEAVE_NOTIFICATIONS: true,
@@ -86,6 +106,28 @@ export default function WawancaraPage() {
                             }}
                             onApiReady={(externalApi) => {
                                 console.log('Jitsi API siap');
+                                if (virtualBgUrl) {
+                                    const applySchoolBackground = () => {
+                                        try {
+                                            externalApi.executeCommand('setVirtualBackground', true, virtualBgUrl);
+                                        } catch (err) {
+                                            console.warn('Gagal menerapkan virtual background otomatis:', err);
+                                        }
+                                    };
+
+                                    applySchoolBackground();
+
+                                    externalApi.addListener('videoConferenceJoined', () => {
+                                        applySchoolBackground();
+                                        setTimeout(applySchoolBackground, 1500);
+                                    });
+
+                                    externalApi.addListener('trackAdded', (track: { type?: string; local?: boolean }) => {
+                                        if (track?.type === 'video' && track?.local) {
+                                            setTimeout(applySchoolBackground, 800);
+                                        }
+                                    });
+                                }
                             }}
                             getIFrameRef={(iframeRef) => {
                                 // Paksa iframe memenuhi seluruh area kontainer

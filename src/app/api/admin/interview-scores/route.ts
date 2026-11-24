@@ -3,6 +3,35 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { requireAdminAuth } from '@/lib/auth/server';
 
+/**
+ * Pastikan tabel interview_scores dan kolom-kolom yang diperlukan tersedia secara idempoten
+ */
+async function ensureInterviewScoresSchema(sql: any) {
+    await sql`
+        CREATE TABLE IF NOT EXISTS interview_scores (
+            id SERIAL PRIMARY KEY,
+            applicant_id INT NOT NULL,
+            rubric_id INT,
+            score INT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    `;
+
+    // Pastikan jika tabel sudah ada dari versi lama, kolom rubric_id dan score tersedia
+    await sql`
+        ALTER TABLE interview_scores 
+        ADD COLUMN IF NOT EXISTS rubric_id INT,
+        ADD COLUMN IF NOT EXISTS score INT DEFAULT 0
+    `;
+
+    // Pastikan kolom rekomendasi dan catatan ada di tabel applicants
+    await sql`
+        ALTER TABLE applicants 
+        ADD COLUMN IF NOT EXISTS interview_recommendation VARCHAR(100),
+        ADD COLUMN IF NOT EXISTS interview_notes TEXT
+    `;
+}
+
 export async function GET(request: NextRequest) {
     const authCheck = await requireAdminAuth();
     if (!authCheck.authorized) return authCheck.response;
@@ -13,6 +42,12 @@ export async function GET(request: NextRequest) {
 
     try {
         const sql = getDb();
+        try {
+            await ensureInterviewScoresSchema(sql);
+        } catch (schemaErr) {
+            console.warn('Warning ensuring interview_scores schema:', schemaErr);
+        }
+
         const scores = await sql`SELECT rubric_id, score FROM interview_scores WHERE applicant_id = ${applicantId}`;
         const applicantInfo = await sql`
             SELECT interview_recommendation, interview_notes 
@@ -48,15 +83,10 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Data tidak lengkap' }, { status: 400 });
         }
 
-        // Pastikan kolom tersedia
         try {
-            await sql`
-                ALTER TABLE applicants 
-                ADD COLUMN IF NOT EXISTS interview_recommendation VARCHAR(100),
-                ADD COLUMN IF NOT EXISTS interview_notes TEXT
-            `;
-        } catch (e) {
-            // ignore
+            await ensureInterviewScoresSchema(sql);
+        } catch (schemaErr) {
+            console.warn('Warning ensuring interview_scores schema in POST:', schemaErr);
         }
 
         // Hapus skor lama

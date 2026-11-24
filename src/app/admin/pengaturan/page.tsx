@@ -7,6 +7,7 @@ import toast, { Toaster } from 'react-hot-toast';
 import { useTheme } from '@/context/ThemeContext';
 import ThemeToggle from '@/components/ThemeToggle';
 import { extractYoutubeVideoId, normalizeAllowedPaths } from '@/lib/rereg-schema';
+import imageCompression from 'browser-image-compression';
 import {
     Settings,
     Calendar,
@@ -67,6 +68,7 @@ export default function PengaturanPage() {
         headmaster_name: '',
         headmaster_nip: '',
         logo_url: '',
+        virtual_background_url: '',
     });
 
     const [majorQuotas, setMajorQuotas] = useState<Record<string, number>>(DEFAULT_QUOTAS);
@@ -107,6 +109,7 @@ export default function PengaturanPage() {
                         headmaster_name: s.headmaster_name || '',
                         headmaster_nip: s.headmaster_nip || '',
                         logo_url: s.logo_url || '',
+                        virtual_background_url: s.virtual_background_url || '',
                     });
 
                     if (s.major_quotas) {
@@ -272,6 +275,96 @@ export default function PengaturanPage() {
                             <div>
                                 <label className={`block text-xs sm:text-sm font-bold mb-1 ${labelCls}`}>URL Logo Sekolah</label>
                                 <input type="text" name="logo_url" value={formData.logo_url} onChange={handleChange} placeholder="https://..." className={`w-full p-2.5 rounded-xl border text-sm font-medium ${inputCls}`} />
+</div>
+                            <div className="sm:col-span-2 pt-2 border-t border-dashed border-gray-700/50">
+                                <label className={`block text-xs sm:text-sm font-bold mb-1 ${labelCls}`}>
+                                    Virtual Background Wawancara (Jitsi 8x8 JaaS)
+                                </label>
+                                <p className="text-xs text-gray-400 mb-2">
+                                    Unggah gambar resmi sekolah atau tempel tautan gambar eksternal (16:9 disarankan, maks 1920px) yang otomatis aktif di ruang wawancara panitia &amp; calon siswa.
+                                </p>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
+                                    <div className="space-y-2">
+                                        <div>
+                                            <span className="block text-[11px] font-semibold text-gray-400 mb-1">Upload File Gambar</span>
+                                            <input
+                                                type="file"
+                                                accept="image/jpeg, image/png, image/webp"
+                                                className={`w-full p-2 rounded-xl border text-xs font-medium file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-teal-600 file:text-white hover:file:bg-teal-500 cursor-pointer ${inputCls}`}
+                                                onChange={async (e) => {
+                                                    const file = e.target.files?.[0];
+                                                    if (!file) return;
+                                                    const loadToast = toast.loading('Mengompres & mengunggah background...');
+                                                    try {
+                                                        const compressed = await imageCompression(file, {
+                                                            maxSizeMB: 0.6,
+                                                            maxWidthOrHeight: 1920,
+                                                            useWebWorker: true,
+                                                        });
+                                                        const uploadRes = await fetch('/api/upload', {
+                                                            method: 'POST',
+                                                            headers: { 'Content-Type': 'application/json' },
+                                                            body: JSON.stringify({
+                                                                fileName: compressed.name,
+                                                                fileType: compressed.type,
+                                                                studentName: 'Sekolah',
+                                                                docType: 'VirtualBackground',
+                                                            }),
+                                                        });
+                                                        const { signedUrl, key } = await uploadRes.json();
+                                                        await fetch(signedUrl, {
+                                                            method: 'PUT',
+                                                            body: compressed,
+                                                        });
+                                                        setFormData((prev) => ({ ...prev, virtual_background_url: key }));
+                                                        toast.success('Virtual background berhasil diunggah!', { id: loadToast });
+                                                    } catch (err) {
+                                                        console.error(err);
+                                                        toast.error('Gagal mengunggah virtual background', { id: loadToast });
+                                                    }
+                                                }}
+                                            />
+                                        </div>
+                                        <div>
+                                            <span className="block text-[11px] font-semibold text-gray-400 mb-1">Atau Tempel URL Eksternal (https://...)</span>
+                                            <input
+                                                type="text"
+                                                name="virtual_background_url"
+                                                value={formData.virtual_background_url}
+                                                onChange={handleChange}
+                                                placeholder="https://domain.com/background.jpg atau documents/VirtualBackground-..."
+                                                className={`w-full p-2.5 rounded-xl border text-xs font-medium ${inputCls}`}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <span className="block text-[11px] font-semibold text-gray-400 mb-1">Pratinjau Background (16:9)</span>
+                                        {formData.virtual_background_url ? (
+                                            <div className="relative aspect-video w-full rounded-xl overflow-hidden border border-gray-700 bg-gray-950 flex items-center justify-center group shadow-md">
+                                                <img
+                                                    src={`/api/virtual-background?src=${encodeURIComponent(formData.virtual_background_url)}`}
+                                                    alt="Virtual Background Preview"
+                                                    className="w-full h-full object-cover"
+                                                />
+                                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setFormData((prev) => ({ ...prev, virtual_background_url: '' }))}
+                                                        className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-bold shadow transition-all"
+                                                    >
+                                                        Hapus Background
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="aspect-video w-full rounded-xl border border-dashed border-gray-700/80 bg-gray-900/40 flex flex-col items-center justify-center p-3 text-center text-gray-500 text-xs">
+                                                <span>Belum ada virtual background</span>
+                                                <span className="text-[10px] mt-0.5 text-gray-600">Standar blur / kamera polos akan digunakan</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                             <div>
                                 <label className={`block text-xs sm:text-sm font-bold mb-1 ${labelCls}`}>Nama Ketua Panitia</label>

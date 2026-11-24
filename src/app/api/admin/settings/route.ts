@@ -42,6 +42,7 @@ export async function PUT(request: NextRequest) {
             headmaster_name,
             headmaster_nip,
             logo_url,
+            virtual_background_url,
         } = body;
 
         const cleanAllowedPaths = normalizeAllowedPaths(allowed_registration_paths);
@@ -88,7 +89,8 @@ export async function PUT(request: NextRequest) {
                 school_city = ${school_city},
                 headmaster_name = ${headmaster_name},
                 headmaster_nip = ${headmaster_nip},
-                logo_url = ${logo_url}
+                logo_url = ${logo_url},
+                virtual_background_url = ${virtual_background_url || null}
             WHERE id = 1
         `;
 
