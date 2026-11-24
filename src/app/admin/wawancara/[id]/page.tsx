@@ -1,7 +1,7 @@
-﻿//src/app/admin/wawancara/[id]/page.tsx
+//src/app/admin/wawancara/[id]/page.tsx
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { JaaSMeeting } from '@jitsi/react-sdk';
 import toast, { Toaster } from 'react-hot-toast';
@@ -98,6 +98,18 @@ export default function AdminWawancaraRoomPage({ params }: { params: Promise<{ i
     const [isSaving, setIsSaving] = useState<boolean>(false);
     const [error, setError] = useState<string>('');
     const [activeTab, setActiveTab] = useState<'rubrik' | 'profil'>('rubrik');
+    // Ref to store Jitsi external API
+    const externalApiRef = useRef<any>(null);
+    // Apply virtual background when both API and URL are ready
+    useEffect(() => {
+        if (externalApiRef.current && virtualBgUrl) {
+            try {
+                externalApiRef.current.executeCommand('setVirtualBackground', true, virtualBgUrl);
+            } catch (err) {
+                console.warn('Failed to set virtual background on update:', err);
+            }
+        }
+    }, [virtualBgUrl]);
 
     useEffect(() => {
         async function loadData() {
