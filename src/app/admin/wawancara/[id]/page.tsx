@@ -92,6 +92,7 @@ export default function AdminWawancaraRoomPage({ params }: { params: Promise<{ i
     const [recommendation, setRecommendation] = useState<string>('');
     const [interviewNotes, setInterviewNotes] = useState<string>('');
     const [jaasToken, setJaasToken] = useState<string>('');
+    const [jaasAppId, setJaasAppId] = useState<string>('');
     const [virtualBgUrl, setVirtualBgUrl] = useState<string>('');
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [isSaving, setIsSaving] = useState<boolean>(false);
@@ -337,10 +338,10 @@ export default function AdminWawancaraRoomPage({ params }: { params: Promise<{ i
             <div className="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
                 {/* Panel Kiri: Jitsi Meet */}
                 <div className="flex-1 h-1/2 lg:h-full relative bg-gray-900 border-b lg:border-b-0 lg:border-r border-gray-800">
-                    {jaasToken ? (
+                    {jaasToken && (jaasAppId || process.env.NEXT_PUBLIC_JAAS_APP_ID) ? (
                         <div className="absolute inset-0">
                             <JaaSMeeting
-                                appId={process.env.NEXT_PUBLIC_JAAS_APP_ID || ''}
+                                appId={jaasAppId || process.env.NEXT_PUBLIC_JAAS_APP_ID || ''}
                                 jwt={jaasToken}
                                 roomName={`Wawancara-PSB-${applicant.registration_number}`}
                                 configOverwrite={{

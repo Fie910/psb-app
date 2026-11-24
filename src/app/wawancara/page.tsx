@@ -1,21 +1,39 @@
 //src/app/wawancara/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { JaaSMeeting } from '@jitsi/react-sdk';
 import Link from 'next/link';
 
-export default function WawancaraPage() {
+function WawancaraContent() {
+    const searchParams = useSearchParams();
+
     const [nisn, setNisn] = useState('');
     const [tanggalLahir, setTanggalLahir] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
+    const [autoFilled, setAutoFilled] = useState(false);
 
     const [isVerified, setIsVerified] = useState(false);
     const [applicantData, setApplicantData] = useState<{ full_name: string, registration_number: string } | null>(null);
     const [jaasToken, setJaasToken] = useState('');
+    const [jaasAppId, setJaasAppId] = useState('');
     const [virtualBgUrl, setVirtualBgUrl] = useState<string>('');
 
+    // Baca query parameter nisn dan tgl (dari halaman /cek-status)
+    useEffect(() => {
+        const queryNisn = searchParams.get('nisn');
+        const queryTgl = searchParams.get('tgl') || searchParams.get('tanggal_lahir');
+
+        if (queryNisn || queryTgl) {
+            if (queryNisn) setNisn(queryNisn.trim());
+            if (queryTgl) setTanggalLahir(queryTgl.trim().split('T')[0]);
+            setAutoFilled(true);
+        }
+    }, [searchParams]);
+
+    // Ambil Pengaturan Sekolah (Virtual Background)
     useEffect(() => {
         async function fetchSettings() {
             try {
@@ -62,11 +80,16 @@ export default function WawancaraPage() {
                 });
                 const tokenData = await tokenRes.json();
 
-                if (tokenRes.ok) {
+                if (tokenRes.ok && tokenData.token) {
+                    if (!tokenData.appId && !process.env.NEXT_PUBLIC_JAAS_APP_ID) {
+                        setError('Konfigurasi JaaS App ID belum tersedia di server.');
+                        return;
+                    }
                     setJaasToken(tokenData.token);
+                    setJaasAppId(tokenData.appId || '');
                     setIsVerified(true);
                 } else {
-                    setError('Gagal menyiapkan ruang wawancara.');
+                    setError(tokenData.error || 'Gagal menyiapkan ruang wawancara.');
                 }
             }
         } catch (err) {
@@ -89,7 +112,7 @@ export default function WawancaraPage() {
                 <div className="flex-1 w-full relative bg-gray-900">
                     <div className="absolute inset-0">
                         <JaaSMeeting
-                            appId={process.env.NEXT_PUBLIC_JAAS_APP_ID || ''}
+                            appId={jaasAppId || process.env.NEXT_PUBLIC_JAAS_APP_ID || ''}
                             jwt={jaasToken}
                             roomName={`Wawancara-PSB-${applicantData.registration_number}`}
                             configOverwrite={{
@@ -151,6 +174,13 @@ export default function WawancaraPage() {
                 <h1 className="text-2xl font-bold text-center mb-2 text-[#2b1d18]">Masuk Ruang Wawancara</h1>
                 <p className="text-center text-sm font-semibold mb-6 text-[#8f472a]">SMK KH. A. WAHAB MUHSIN</p>
 
+                {autoFilled && (
+                    <div className="mb-4 p-3 rounded-xl bg-teal-50 border border-teal-200 text-teal-800 text-xs">
+                        <span className="font-bold block mb-0.5">Data Terisi Otomatis</span>
+                        Data NISN dan Tanggal Lahir telah terisi dari pencarian status Anda. Silakan periksa lalu klik <strong>Masuk Wawancara</strong>.
+                    </div>
+                )}
+
                 {error && <p className="text-red-600 text-sm font-semibold mb-4 text-center bg-red-100 p-2 rounded">{error}</p>}
 
                 <form onSubmit={handleVerify} className="space-y-4">
@@ -174,5 +204,20 @@ export default function WawancaraPage() {
                 </div>
             </div>
         </main>
+    );
+}
+
+export default function WawancaraPage() {
+    return (
+        <Suspense
+            fallback={
+                <main className="min-h-screen bg-gray-950 flex flex-col items-center justify-center text-white">
+                    <div className="w-10 h-10 border-4 border-teal-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+                    <p className="text-sm font-semibold text-teal-300">Menyiapkan Ruang Wawancara...</p>
+                </main>
+            }
+        >
+            <WawancaraContent />
+        </Suspense>
     );
 }

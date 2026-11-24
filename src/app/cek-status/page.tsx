@@ -365,6 +365,10 @@ export default function CekStatusPage() {
         ? `/daftar-ulang?nisn=${encodeURIComponent(applicant.nisn)}&tgl=${encodeURIComponent((applicant.tanggal_lahir || tanggalLahir).split('T')[0])}`
         : '/daftar-ulang';
 
+    const wawancaraHref = applicant
+        ? `/wawancara?nisn=${encodeURIComponent(applicant.nisn)}&tgl=${encodeURIComponent((applicant.tanggal_lahir || tanggalLahir).split('T')[0])}`
+        : '/wawancara';
+
     return (
         <>
             {/* ===== TAMPILAN WEB ===== */}
@@ -654,10 +658,10 @@ export default function CekStatusPage() {
                                             <>
                                                 <p className={`font-bold text-lg ${isDarkMode ? 'text-teal-200' : 'text-teal-950'}`}>{formatDate(applicant.interview_date)}</p>
                                                 <p className={`text-xs mb-3 ${isDarkMode ? 'text-teal-400' : 'text-teal-800'}`}>Pukul: {applicant.interview_time.slice(0, 5)} WIB</p>
-                                                <a href="/wawancara" className="flex items-center justify-center gap-2 w-full py-3 rounded-xl font-bold text-center shadow-lg transition-all animate-pulse bg-teal-600 hover:bg-teal-700 text-white">
+                                                <Link href={wawancaraHref} className="flex items-center justify-center gap-2 w-full py-3 rounded-xl font-bold text-center shadow-lg transition-all animate-pulse bg-teal-600 hover:bg-teal-700 text-white">
                                                     <Video className="w-4 h-4" />
                                                     Masuk Ruang Wawancara &rarr;
-                                                </a>
+                                                </Link>
                                             </>
                                         ) : (
                                             <>

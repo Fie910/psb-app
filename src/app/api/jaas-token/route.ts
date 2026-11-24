@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
             })
             .sign(privateKey);
 
-        return NextResponse.json({ token }, { status: 200 });
+        return NextResponse.json({ token, appId }, { status: 200 });
     } catch (error) {
         console.error('Error generate JWT:', error);
         return NextResponse.json({ error: 'Gagal membuat token JaaS' }, { status: 500 });

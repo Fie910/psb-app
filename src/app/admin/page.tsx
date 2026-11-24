@@ -827,7 +827,7 @@ export default function AdminDashboard() {
 
             <div className="max-w-[1540px] mx-auto z-10 relative space-y-6">
                 {/* Header Card */}
-                <div className={`p-6 sm:p-8 rounded-3xl border backdrop-blur-xl shadow-xl transition-all duration-300 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 ${isDarkMode
+                <div className={`relative z-30 p-6 sm:p-8 rounded-3xl border backdrop-blur-xl shadow-xl transition-all duration-300 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 ${isDarkMode
                     ? 'bg-gray-900/75 border-gray-800 shadow-black/40'
                     : 'bg-[#fffdf9]/92 border-white shadow-[#5c4033]/15'
                     }`}>
@@ -1548,15 +1548,14 @@ export default function AdminDashboard() {
                                                         {app.interview_recommendation && (
                                                             <div
                                                                 title={app.interview_notes ? `Catatan: ${app.interview_notes}` : undefined}
-                                                                className={`text-[11px] font-bold px-2 py-0.5 rounded-lg border inline-flex items-center gap-1 max-w-full cursor-help ${
-                                                                    app.interview_recommendation.includes('Pilihan 1')
+                                                                className={`text-[11px] font-bold px-2 py-0.5 rounded-lg border inline-flex items-center gap-1 max-w-full cursor-help ${app.interview_recommendation.includes('Pilihan 1')
                                                                         ? 'bg-teal-50 text-teal-900 border-teal-300 dark:bg-teal-950/50 dark:text-teal-300 dark:border-teal-700'
                                                                         : app.interview_recommendation.includes('Pilihan 2')
-                                                                        ? 'bg-blue-50 text-blue-900 border-blue-300 dark:bg-blue-950/50 dark:text-blue-300 dark:border-blue-700'
-                                                                        : app.interview_recommendation.includes('Tidak')
-                                                                        ? 'bg-rose-50 text-rose-900 border-rose-300 dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-700'
-                                                                        : 'bg-amber-50 text-amber-900 border-amber-300 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-700'
-                                                                }`}
+                                                                            ? 'bg-blue-50 text-blue-900 border-blue-300 dark:bg-blue-950/50 dark:text-blue-300 dark:border-blue-700'
+                                                                            : app.interview_recommendation.includes('Tidak')
+                                                                                ? 'bg-rose-50 text-rose-900 border-rose-300 dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-700'
+                                                                                : 'bg-amber-50 text-amber-900 border-amber-300 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-700'
+                                                                    }`}
                                                             >
                                                                 <MessageCircle className="w-3 h-3 shrink-0 opacity-70" />
                                                                 <span className="truncate">Wawancara: {app.interview_recommendation}</span>
