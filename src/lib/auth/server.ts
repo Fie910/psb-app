@@ -1,6 +1,7 @@
 //src/lib/auth/server.ts
 import { createNeonAuth } from '@neondatabase/auth/next/server';
 import { NextResponse } from 'next/server';
+import { getAdminRole, type PanitiaRole } from '@/lib/rbac';
 
 // Fallback dummy secret agar proses evaluasi modul Next.js saat build-time tidak crash jika env belum terpasang
 const baseUrl = process.env.NEON_AUTH_BASE_URL || 'https://dummy-auth.neon.tech';
@@ -38,10 +39,15 @@ export async function requireAdminAuth() {
             };
         }
 
+        const role = await getAdminRole(sessionData.user.id, sessionData.user.email);
+
         return {
             authorized: true as const,
             session: sessionData.session,
-            user: sessionData.user,
+            user: {
+                ...sessionData.user,
+                role,
+            },
         };
     } catch {
         return {
@@ -53,3 +59,29 @@ export async function requireAdminAuth() {
         };
     }
 }
+
+/**
+ * Memeriksa apakah aktor admin memiliki salah satu peran yang diizinkan (RBAC)
+ */
+export async function requireAdminRole(allowedRoles: PanitiaRole[]) {
+    const authResult = await requireAdminAuth();
+    if (!authResult.authorized) {
+        return authResult;
+    }
+
+    const userRole = authResult.user.role || 'super_admin';
+    if (!allowedRoles.includes(userRole)) {
+        return {
+            authorized: false as const,
+            response: NextResponse.json(
+                {
+                    error: `Forbidden: Peran '${userRole}' tidak memiliki hak akses untuk tindakan ini. Diperlukan salah satu dari: ${allowedRoles.join(', ')}`,
+                },
+                { status: 403 }
+            ),
+        };
+    }
+
+    return authResult;
+}
+

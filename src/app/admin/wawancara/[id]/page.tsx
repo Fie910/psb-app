@@ -22,7 +22,10 @@ import {
     Calculator,
     Compass,
     MessageSquare,
-    ExternalLink
+    ExternalLink,
+    Volume2,
+    VolumeX,
+    Bell
 } from 'lucide-react';
 
 type Applicant = {
@@ -99,6 +102,69 @@ export default function AdminWawancaraRoomPage({ params }: { params: Promise<{ i
     const [isSaving, setIsSaving] = useState<boolean>(false);
     const [error, setError] = useState<string>('');
     const [activeTab, setActiveTab] = useState<'rubrik' | 'profil'>('rubrik');
+    const [isApplicantWaiting, setIsApplicantWaiting] = useState<boolean>(false);
+    const [isMuted, setIsMuted] = useState<boolean>(() => {
+        if (typeof window !== 'undefined') {
+            return localStorage.getItem('wawancara_sound_muted') === 'true';
+        }
+        return false;
+    });
+    const prevWaitingRef = useRef<boolean>(false);
+
+    const playNotificationChime = () => {
+        if (isMuted || typeof window === 'undefined') return;
+        try {
+            const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+            if (!AudioCtx) return;
+            const ctx = new AudioCtx();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+            osc.frequency.setValueAtTime(880, ctx.currentTime + 0.12);
+            gain.gain.setValueAtTime(0.08, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.45);
+        } catch {
+            // Ignore audio context restrictions
+        }
+    };
+
+    const toggleMute = () => {
+        setIsMuted((prev) => {
+            const next = !prev;
+            if (typeof window !== 'undefined') {
+                localStorage.setItem('wawancara_sound_muted', String(next));
+            }
+            return next;
+        });
+    };
+
+    useEffect(() => {
+        if (!applicant?.id) return;
+        const checkPresence = async () => {
+            try {
+                const res = await fetch(`/api/wawancara/presence?applicant_id=${applicant.id}`);
+                if (!res.ok) return;
+                const data = await res.json();
+                const waiting = Boolean(data.is_waiting);
+                setIsApplicantWaiting(waiting);
+                if (waiting && !prevWaitingRef.current) {
+                    playNotificationChime();
+                    toast.success(`${data.full_name || 'Peserta'} sudah masuk ruang wawancara!`);
+                }
+                prevWaitingRef.current = waiting;
+            } catch {
+                // Ignore transient network errors
+            }
+        };
+        checkPresence();
+        const interval = setInterval(checkPresence, 8000);
+        return () => clearInterval(interval);
+    }, [applicant?.id, isMuted]);
     // Ref to store Jitsi external API
     const externalApiRef = useRef<any>(null);
     // Apply virtual background when both API and URL are ready
@@ -333,6 +399,26 @@ export default function AdminWawancaraRoomPage({ params }: { params: Promise<{ i
                 </div>
 
                 <div className="flex items-center gap-3">
+                    {/* Indikator Ruang Tunggu Real-Time */}
+                    <div
+                        className={`hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border ${isApplicantWaiting
+                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 animate-pulse'
+                            : 'bg-gray-800 text-gray-400 border-gray-700'
+                            }`}
+                    >
+                        <Bell className="w-3.5 h-3.5" />
+                        <span>{isApplicantWaiting ? 'Peserta Sudah Masuk Ruang' : 'Menunggu Peserta'}</span>
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={toggleMute}
+                        title={isMuted ? 'Aktifkan Suara Notifikasi' : 'Bisukan Suara Notifikasi'}
+                        className="p-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700 transition-colors"
+                    >
+                        {isMuted ? <VolumeX className="w-4 h-4 text-rose-400" /> : <Volume2 className="w-4 h-4 text-emerald-400" />}
+                    </button>
+
                     <div className="text-right hidden sm:block">
                         <div className="text-xs font-bold text-teal-300">
                             Skor: {totalScore} / {maxScore} ({answeredCount}/{rubric.length} Pertanyaan)

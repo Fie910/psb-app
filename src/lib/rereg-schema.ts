@@ -69,6 +69,15 @@ export async function ensureReRegistrationSchema(sql: NeonQueryFunction<false, f
             )
         `;
 
+        // Kolom tambahan untuk Rekap Keuangan & Nominal Pembayaran Daftar Ulang
+        await sql`
+            ALTER TABLE re_registrations
+            ADD COLUMN IF NOT EXISTS payment_amount BIGINT DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS payment_ref_code VARCHAR(100),
+            ADD COLUMN IF NOT EXISTS payment_verified_by VARCHAR(180),
+            ADD COLUMN IF NOT EXISTS payment_verified_at TIMESTAMP WITH TIME ZONE
+        `;
+
         schemaEnsured = true;
     } catch (err) {
         // Jangan biarkan migrasi DDL otomatis membuat API crash jika koneksi lambat/timeout

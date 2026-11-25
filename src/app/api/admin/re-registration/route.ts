@@ -1,8 +1,9 @@
 //src/app/api/admin/re-registration/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
-import { requireAdminAuth } from '@/lib/auth/server';
+import { requireAdminRole } from '@/lib/auth/server';
 import { ensureReRegistrationSchema } from '@/lib/rereg-schema';
+import { logAdminAudit } from '@/lib/audit-log';
 
 const ALLOWED_REREG_STATUSES = [
     'Menunggu Verifikasi',
@@ -11,7 +12,7 @@ const ALLOWED_REREG_STATUSES = [
 ];
 
 export async function PUT(request: NextRequest) {
-    const authCheck = await requireAdminAuth();
+    const authCheck = await requireAdminRole(['super_admin', 'verifikator', 'bendahara']);
     if (!authCheck.authorized) return authCheck.response;
 
     try {
@@ -61,6 +62,23 @@ export async function PUT(request: NextRequest) {
                 WHERE applicant_id = ${applicant_id}
             `;
         }
+
+        // Catat Audit Log Verifikasi Daftar Ulang
+        await logAdminAudit({
+            actor_id: authCheck.user.id,
+            actor_name: authCheck.user.name || 'Panitia',
+            actor_email: authCheck.user.email,
+            actor_role: authCheck.user.role,
+            action: 'VERIFY_REREG',
+            target_type: 're_registration',
+            target_id: applicant_id,
+            summary: `Mengubah status verifikasi daftar ulang pendaftar ID #${applicant_id} menjadi '${rereg_status}'`,
+            metadata: {
+                applicant_id,
+                rereg_status,
+                rereg_notes,
+            },
+        });
 
         return NextResponse.json({
             message: `Status daftar ulang berhasil diubah menjadi: ${rereg_status}`,

@@ -99,6 +99,40 @@ function WawancaraContent() {
         }
     };
 
+    useEffect(() => {
+        if (!isVerified || !applicantData?.registration_number) return;
+        const regNumber = applicantData.registration_number;
+        const sendPresence = (active: boolean) => {
+            fetch('/api/wawancara/presence', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ registration_number: regNumber, active }),
+                keepalive: !active,
+            }).catch(() => {});
+        };
+        const handleLeave = () => {
+            if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
+                const blob = new Blob(
+                    [JSON.stringify({ registration_number: regNumber, active: false })],
+                    { type: 'application/json' }
+                );
+                navigator.sendBeacon('/api/wawancara/presence', blob);
+            } else {
+                sendPresence(false);
+            }
+        };
+        sendPresence(true);
+        const interval = setInterval(() => sendPresence(true), 15000);
+        window.addEventListener('pagehide', handleLeave);
+        window.addEventListener('beforeunload', handleLeave);
+        return () => {
+            clearInterval(interval);
+            window.removeEventListener('pagehide', handleLeave);
+            window.removeEventListener('beforeunload', handleLeave);
+            sendPresence(false);
+        };
+    }, [isVerified, applicantData?.registration_number]);
+
     if (isVerified && applicantData) {
         return (
             <main className="min-h-screen bg-gray-900 flex flex-col">

@@ -16,7 +16,10 @@ export async function GET() {
       await sql`
         ALTER TABLE applicants 
         ADD COLUMN IF NOT EXISTS interview_recommendation VARCHAR(100),
-        ADD COLUMN IF NOT EXISTS interview_notes TEXT
+        ADD COLUMN IF NOT EXISTS interview_notes TEXT,
+        ADD COLUMN IF NOT EXISTS last_wa_sent_at TIMESTAMP WITH TIME ZONE,
+        ADD COLUMN IF NOT EXISTS last_wa_sent_by VARCHAR(180),
+        ADD COLUMN IF NOT EXISTS last_wa_recipient VARCHAR(40)
       `;
     } catch (e) {
       // ignore
@@ -37,6 +40,7 @@ export async function GET() {
         a.interview_link,
         a.accepted_major, a.accepted_at,
         a.interview_recommendation, a.interview_notes,
+        a.last_wa_sent_at, a.last_wa_sent_by, a.last_wa_recipient,
         r.id as rereg_id,
         r.rereg_status,
         r.rereg_notes,

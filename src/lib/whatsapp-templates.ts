@@ -1,6 +1,7 @@
 //src/lib/whatsapp-templates.ts
 
 export interface WhatsAppApplicantData {
+    id?: number;
     registration_number?: string | null;
     full_name: string;
     phone?: string | null;
@@ -19,6 +20,9 @@ export interface WhatsAppApplicantData {
     accepted_major?: string | null;
     rereg_status?: string | null;
     rereg_notes?: string | null;
+    last_wa_sent_at?: string | null;
+    last_wa_sent_by?: string | null;
+    last_wa_recipient?: string | null;
 }
 
 export interface WhatsAppSiteSettings {

@@ -1,6 +1,8 @@
 //src/app/api/admin/bulk-action/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
+import { requireAdminRole } from '@/lib/auth/server';
+import { logAdminAudit } from '@/lib/audit-log';
 
 const ALLOWED_STATUSES = [
     'Pending',
@@ -11,6 +13,9 @@ const ALLOWED_STATUSES = [
 ];
 
 export async function POST(request: NextRequest) {
+    const authCheck = await requireAdminRole(['super_admin', 'verifikator']);
+    if (!authCheck.authorized) return authCheck.response;
+
     try {
         const sql = getDb();
         const body = await request.json();
@@ -81,6 +86,29 @@ export async function POST(request: NextRequest) {
                 WHERE id = ANY(${applicantIds}::int[])
             `;
             }
+
+            // Catat audit log untuk bulk schedule
+            await logAdminAudit({
+                actor_id: authCheck.user.id,
+                actor_name: authCheck.user.name || 'Panitia',
+                actor_email: authCheck.user.email,
+                actor_role: authCheck.user.role,
+                action: 'BULK_ACTION',
+                target_type: 'applicant',
+                target_id: `${applicantIds.length} applicants`,
+                summary: `Menjadwalkan tes/wawancara massal untuk ${applicantIds.length} peserta`,
+                metadata: {
+                    action_type: 'bulk_schedule',
+                    applicant_count: applicantIds.length,
+                    applicant_ids: applicantIds,
+                    testDate,
+                    testTime,
+                    testLocation,
+                    interviewDate,
+                    interviewTime,
+                    setReadyStatus,
+                },
+            });
 
             return NextResponse.json({
                 message: `Jadwal berhasil diterapkan ke ${applicantIds.length} peserta.`,
@@ -153,6 +181,26 @@ export async function POST(request: NextRequest) {
                 `;
                 }
             }
+
+            // Catat audit log untuk bulk status
+            await logAdminAudit({
+                actor_id: authCheck.user.id,
+                actor_name: authCheck.user.name || 'Panitia',
+                actor_email: authCheck.user.email,
+                actor_role: authCheck.user.role,
+                action: 'BULK_ACTION',
+                target_type: 'applicant',
+                target_id: `${applicantIds.length} applicants`,
+                summary: `Mengubah status massal untuk ${applicantIds.length} peserta menjadi '${status}'`,
+                metadata: {
+                    action_type: 'bulk_status',
+                    new_status: status,
+                    major_mode: majorMode,
+                    custom_major: customMajor,
+                    applicant_count: applicantIds.length,
+                    applicant_ids: applicantIds,
+                },
+            });
 
             return NextResponse.json({
                 message: `Status ${applicantIds.length} peserta berhasil diubah menjadi "${status}".`,

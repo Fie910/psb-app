@@ -44,7 +44,10 @@ import {
     MessageCircle,
     Database,
     ShieldCheck,
-    Trophy
+    Trophy,
+    History as HistoryIcon,
+    Wallet,
+    TrendingUp
 } from 'lucide-react';
 import AdminRankingPanel from '@/components/AdminRankingPanel';
 
@@ -394,6 +397,16 @@ export default function AdminDashboard() {
                     school_choice: a.school_choice,
                     school_choice_2: a.school_choice_2,
                     status: a.status,
+                    phone: a.phone,
+                    parent_phone: a.parent_phone,
+                    registration_path: a.registration_path,
+                    test_date: a.test_date,
+                    test_time: a.test_time,
+                    test_location: a.test_location,
+                    interview_date: a.interview_date,
+                    interview_time: a.interview_time,
+                    accepted_major: a.accepted_major,
+                    rereg_status: a.rereg_status,
                 })),
         [applicants, selectedIds]
     );
@@ -446,64 +459,73 @@ export default function AdminDashboard() {
         toast.success(`Berhasil mengekspor ${sourceData.length} data pendaftar`);
     };
 
-    const handleExportDapodik = () => {
+    const handleExportDapodik = async () => {
         setExportMenuOpen(false);
-        const reregStudents = applicants.filter((a) => Boolean(a.rereg_status));
-        if (reregStudents.length === 0) {
-            toast.error('Belum ada peserta yang mengirimkan data Daftar Ulang.');
-            return;
+        try {
+            const toastId = toast.loading('Mengambil data siap import Dapodik...');
+            const res = await fetch('/api/admin/export-dapodik');
+            const data = await res.json();
+
+            if (!res.ok || !data.students || data.students.length === 0) {
+                toast.error(data.error || 'Belum ada data siswa diterima untuk ekspor Dapodik.', { id: toastId });
+                return;
+            }
+
+            const dapodikRows = data.students.map((app: any, index: number) => ({
+                'No': index + 1,
+                'No Pendaftaran': String(app.registration_number || ''),
+                'Nama Lengkap': String(app.full_name || ''),
+                'NISN': String(app.nisn || ''),
+                'NIK': String(app.nik || ''),
+                'No KK': String(app.no_kk || ''),
+                'Jenis Kelamin': String(app.gender || '-'),
+                'Tempat Lahir': String(app.birth_place || '-'),
+                'Tanggal Lahir': app.tanggal_lahir ? String(app.tanggal_lahir).split('T')[0] : '-',
+                'Agama': String(app.religion || '-'),
+                'Asal Sekolah (SMP/MTs)': String(app.asal_sekolah || '-'),
+                'Kompetensi Keahlian Diterima': String(app.accepted_major || '-'),
+                'Jalur Pendaftaran': String(app.registration_path || 'Reguler'),
+                'Alamat Jalan': String(app.address_street || '-'),
+                'RT/RW': String(app.rt_rw || '-'),
+                'Kelurahan/Desa': String(app.village || '-'),
+                'Kecamatan': String(app.district || '-'),
+                'Kabupaten/Kota': String(app.city || '-'),
+                'Kode Pos': String(app.postal_code || '-'),
+                'Tinggal Bersama': String(app.living_with || '-'),
+                'Anak Ke-': app.child_order ?? '-',
+                'Jumlah Saudara': app.siblings_count ?? '-',
+                'Tinggi Badan (cm)': app.height_cm ?? '-',
+                'Berat Badan (kg)': app.weight_kg ?? '-',
+                'Golongan Darah': String(app.blood_type || '-'),
+                'Catatan Medis': String(app.medical_notes || '-'),
+                'Ukuran Seragam': String(app.uniform_size || '-'),
+                'No HP Siswa': String(app.phone || ''),
+                'Email': String(app.email || ''),
+                'Nama Ayah': String(app.father_name || '-'),
+                'NIK Ayah': String(app.father_nik || ''),
+                'Pendidikan Ayah': String(app.father_education || '-'),
+                'Pekerjaan Ayah': String(app.father_occupation || '-'),
+                'Penghasilan Ayah': String(app.father_income || '-'),
+                'Nama Ibu': String(app.mother_name || '-'),
+                'NIK Ibu': String(app.mother_nik || ''),
+                'Pendidikan Ibu': String(app.mother_education || '-'),
+                'Pekerjaan Ibu': String(app.mother_occupation || '-'),
+                'Penghasilan Ibu': String(app.mother_income || '-'),
+                'Nama Wali': String(app.guardian_name || '-'),
+                'No HP Wali': String(app.guardian_phone || ''),
+                'Pekerjaan Wali': String(app.guardian_occupation || '-'),
+                'Skema Pembayaran': String(app.payment_scheme || '-'),
+                'Status Daftar Ulang': String(app.rereg_status || 'Belum Mengisi'),
+            }));
+
+            const ws = XLSX.utils.json_to_sheet(dapodikRows);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Format_Import_Dapodik');
+            XLSX.writeFile(wb, `Ekspor_Siap_Import_Dapodik_${new Date().toISOString().slice(0, 10)}.xlsx`);
+            toast.success(`Berhasil mengekspor ${data.students.length} data siap Dapodik!`, { id: toastId });
+        } catch {
+            toast.error('Gagal mengambil data ekspor Dapodik.');
         }
-
-        const dapodikRows = reregStudents.map((app, index) => ({
-            'No': index + 1,
-            'No Pendaftaran': app.registration_number,
-            'Status Verifikasi DU': app.rereg_status,
-            'Kompetensi Keahlian': app.accepted_major || app.school_choice,
-            'Nama Lengkap': app.full_name,
-            'NISN': app.nisn,
-            'NIK Siswa': app.nik || '-',
-            'No. Kartu Keluarga (KK)': app.no_kk || '-',
-            'Tempat Lahir': app.birth_place || '-',
-            'Tanggal Lahir': app.tanggal_lahir ? String(app.tanggal_lahir).split('T')[0] : '-',
-            'Jenis Kelamin': app.gender || '-',
-            'Agama': app.religion || '-',
-            'Anak Ke-': app.child_order ?? '-',
-            'Jumlah Saudara Kandung': app.siblings_count ?? '-',
-            'Alamat Jalan / Kampung': app.address_street || '-',
-            'RT / RW': app.rt_rw || '-',
-            'Desa / Kelurahan': app.village || '-',
-            'Kecamatan': app.district || '-',
-            'Kabupaten / Kota': app.city || '-',
-            'Kode Pos': app.postal_code || '-',
-            'Status Tempat Tinggal': app.living_with || '-',
-            'Tinggi Badan (cm)': app.height_cm ?? '-',
-            'Berat Badan (kg)': app.weight_kg ?? '-',
-            'Golongan Darah': app.blood_type || '-',
-            'Catatan Kesehatan/Alergi': app.medical_notes || '-',
-            'Asal Sekolah (SMP/MTs)': app.asal_sekolah || '-',
-            'No. HP Siswa': app.phone || '-',
-            'Email Siswa': app.email || '-',
-            'Nama Ayah Kandung': app.father_name || '-',
-            'NIK Ayah': app.father_nik || '-',
-            'Pendidikan Ayah': app.father_education || '-',
-            'Pekerjaan Ayah': app.father_occupation || '-',
-            'Penghasilan Ayah': app.father_income || '-',
-            'Nama Ibu Kandung': app.mother_name || '-',
-            'NIK Ibu': app.mother_nik || '-',
-            'Pendidikan Ibu': app.mother_education || '-',
-            'Pekerjaan Ibu': app.mother_occupation || '-',
-            'Penghasilan Ibu': app.mother_income || '-',
-            'No. HP Orang Tua': app.parent_phone || '-',
-            'Nama Wali': app.guardian_name || '-',
-            'No. HP Wali': app.guardian_phone || '-',
-            'Pekerjaan Wali': app.guardian_occupation || '-',
-        }));
-
-        const ws = XLSX.utils.json_to_sheet(dapodikRows);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Data_Induk_Dapodik');
-        XLSX.writeFile(wb, `Ekspor_Dapodik_Siswa_Baru_${new Date().toISOString().slice(0, 10)}.xlsx`);
-        toast.success(`Berhasil mengekspor ${reregStudents.length} data siap Dapodik!`);
     };
 
     const handleExportSeragamPembayaran = () => {
@@ -913,6 +935,42 @@ export default function AdminDashboard() {
                                 </>
                             )}
                         </div>
+
+                        <Link
+                            href="/admin/keuangan"
+                            className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs sm:text-[13px] font-bold border transition-all duration-200 shadow-sm active:scale-95 ${isDarkMode
+                                ? 'bg-amber-950/60 hover:bg-amber-900/70 border-amber-800/60 text-amber-300'
+                                : 'bg-amber-50 hover:bg-amber-100 border-amber-200 text-amber-900'
+                                }`}
+                            title="Rekap Keuangan & Kas Masuk"
+                        >
+                            <Wallet className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                            <span className="hidden sm:inline">Kas/Keuangan</span>
+                        </Link>
+
+                        <Link
+                            href="/admin/audit-log"
+                            className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs sm:text-[13px] font-bold border transition-all duration-200 shadow-sm active:scale-95 ${isDarkMode
+                                ? 'bg-rose-950/60 hover:bg-rose-900/70 border-rose-800/60 text-rose-300'
+                                : 'bg-rose-50 hover:bg-rose-100 border-rose-200 text-rose-900'
+                                }`}
+                            title="Audit Log Aktivitas Panitia"
+                        >
+                            <HistoryIcon className="w-4 h-4 text-rose-600 dark:text-rose-400" />
+                            <span className="hidden sm:inline">Audit Log</span>
+                        </Link>
+
+                        <Link
+                            href="/admin/statistik"
+                            className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs sm:text-[13px] font-bold border transition-all duration-200 shadow-sm active:scale-95 ${isDarkMode
+                                ? 'bg-emerald-950/60 hover:bg-emerald-900/70 border-emerald-800/60 text-emerald-300'
+                                : 'bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-900'
+                                }`}
+                            title="Statistik & Laporan Pleno Eksekutif"
+                        >
+                            <TrendingUp className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                            <span className="hidden sm:inline">Statistik</span>
+                        </Link>
 
                         <Link
                             href="/admin/kelola-panitia"
@@ -1759,6 +1817,7 @@ export default function AdminDashboard() {
             {/* FLOATING ACTION BAR: TINDAKAN MASSAL (JADWAL & STATUS) */}
             <AdminBulkActionBar
                 selectedApplicants={selectedApplicantsSummary}
+                settings={siteSettings}
                 onClearSelection={() => setSelectedIds([])}
                 onSuccess={fetchApplicants}
             />

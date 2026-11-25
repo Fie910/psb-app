@@ -1,7 +1,8 @@
 //src/app/api/admin/interview-scores/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
-import { requireAdminAuth } from '@/lib/auth/server';
+import { requireAdminAuth, requireAdminRole } from '@/lib/auth/server';
+import { logAdminAudit } from '@/lib/audit-log';
 
 /**
  * Pastikan tabel interview_scores dan kolom-kolom yang diperlukan tersedia secara idempoten
@@ -68,7 +69,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-    const authCheck = await requireAdminAuth();
+    const authCheck = await requireAdminRole(['super_admin', 'pewawancara']);
     if (!authCheck.authorized) return authCheck.response;
 
     try {
@@ -135,6 +136,25 @@ export async function POST(request: NextRequest) {
                 interview_notes = ${interview_notes || null}
             WHERE id = ${applicant_id}
         `;
+
+        // Catat Audit Log Penilaian Wawancara
+        await logAdminAudit({
+            actor_id: authCheck.user.id,
+            actor_name: authCheck.user.name || 'Pewawancara',
+            actor_email: authCheck.user.email,
+            actor_role: authCheck.user.role,
+            action: 'SAVE_INTERVIEW_SCORE',
+            target_type: 'applicant',
+            target_id: applicant_id,
+            summary: `Menyimpan penilaian wawancara pendaftar ID #${applicant_id} (Total skor: ${totalScore}, Rekomendasi: ${interview_recommendation || 'Belum ada'})`,
+            metadata: {
+                applicant_id,
+                total_skor: totalScore,
+                scores,
+                interview_recommendation,
+                interview_notes,
+            },
+        });
 
         return NextResponse.json({ message: 'Skor dan rekomendasi berhasil disimpan' });
     } catch (error) {

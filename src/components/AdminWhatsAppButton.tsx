@@ -11,16 +11,19 @@ import {
     buildWhatsAppUrl,
     normalizeIndonesianPhone
 } from '@/lib/whatsapp-templates';
-import { MessageCircle, ExternalLink, Copy, RotateCcw, X, Phone } from 'lucide-react';
+import { MessageCircle, ExternalLink, Copy, RotateCcw, X, Phone, CheckCheck } from 'lucide-react';
 
 interface AdminWhatsAppButtonProps {
     applicant: WhatsAppApplicantData;
     settings?: WhatsAppSiteSettings | null;
+    onWaLogged?: (lastSentAt: string, lastSentBy: string) => void;
 }
 
-export default function AdminWhatsAppButton({ applicant, settings }: AdminWhatsAppButtonProps) {
+export default function AdminWhatsAppButton({ applicant, settings, onWaLogged }: AdminWhatsAppButtonProps) {
     const { isDarkMode } = useTheme();
     const [isOpen, setIsOpen] = useState(false);
+    const [lastSentAt, setLastSentAt] = useState<string | null>(applicant.last_wa_sent_at || null);
+    const [lastSentBy, setLastSentBy] = useState<string | null>(applicant.last_wa_sent_by || null);
 
     const studentPhone = normalizeIndonesianPhone(applicant.phone);
     const parentPhone = normalizeIndonesianPhone(applicant.parent_phone);
@@ -56,20 +59,49 @@ export default function AdminWhatsAppButton({ applicant, settings }: AdminWhatsA
         }
     };
 
-    const handleSendWhatsApp = () => {
+    const handleSendWhatsApp = async () => {
         if (!activePhone) {
             toast.error('Nomor WhatsApp siswa maupun orang tua tidak tersedia.');
             return;
         }
+
+        // Buka chat WA di tab baru
         const url = buildWhatsAppUrl(activePhone, customMessage);
         window.open(url, '_blank', 'noopener,noreferrer');
         setIsOpen(false);
+
+        // Catat log pengiriman ke database server jika applicant.id tersedia
+        if (applicant.id) {
+            try {
+                const res = await fetch('/api/admin/wa-log', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        applicant_id: applicant.id,
+                        recipient_phone: activePhone,
+                        recipient_type: recipientType,
+                        message_preview: customMessage,
+                    }),
+                });
+                const data = await res.json();
+                if (res.ok && data.last_wa_sent_at) {
+                    setLastSentAt(data.last_wa_sent_at);
+                    setLastSentBy(data.last_wa_sent_by || 'Panitia');
+                    if (onWaLogged) {
+                        onWaLogged(data.last_wa_sent_at, data.last_wa_sent_by || 'Panitia');
+                    }
+                    toast.success('Pesan WA dibuka & status pengiriman tercatat.');
+                }
+            } catch (err) {
+                console.warn('Gagal mencatat log WA ke server:', err);
+            }
+        }
     };
 
     const hasAnyPhone = Boolean(studentPhone || parentPhone);
 
     return (
-        <>
+        <div className="flex flex-col items-start gap-1">
             <button
                 type="button"
                 onClick={handleOpenModal}
@@ -84,6 +116,18 @@ export default function AdminWhatsAppButton({ applicant, settings }: AdminWhatsA
                 <MessageCircle className="w-3.5 h-3.5" />
                 <span>Info WA</span>
             </button>
+
+            {lastSentAt && (
+                <div
+                    className="inline-flex items-center gap-1 text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold"
+                    title={`Terkirim: ${new Date(lastSentAt).toLocaleString('id-ID')} oleh ${lastSentBy || 'Panitia'}`}
+                >
+                    <CheckCheck className="w-3 h-3 text-emerald-600" />
+                    <span>
+                        {new Date(lastSentAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}
+                    </span>
+                </div>
+            )}
 
             {isOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 text-left">
@@ -221,8 +265,6 @@ export default function AdminWhatsAppButton({ applicant, settings }: AdminWhatsA
                     </div>
                 </div>
             )}
-        </>
+        </div>
     );
-
-
 }

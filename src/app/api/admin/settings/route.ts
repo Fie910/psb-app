@@ -1,11 +1,12 @@
 //src/app/api/admin/settings/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
-import { requireAdminAuth } from '@/lib/auth/server';
+import { requireAdminRole } from '@/lib/auth/server';
 import { ensureReRegistrationSchema, normalizeAllowedPaths } from '@/lib/rereg-schema';
+import { logAdminAudit } from '@/lib/audit-log';
 
 export async function PUT(request: NextRequest) {
-    const authCheck = await requireAdminAuth();
+    const authCheck = await requireAdminRole(['super_admin']);
     if (!authCheck.authorized) return authCheck.response;
 
     try {
@@ -93,6 +94,24 @@ export async function PUT(request: NextRequest) {
                 virtual_background_url = ${virtual_background_url || null}
             WHERE id = 1
         `;
+
+        await logAdminAudit({
+            actor_id: authCheck.user.id,
+            actor_name: authCheck.user.name || 'Panitia',
+            actor_email: authCheck.user.email,
+            actor_role: authCheck.user.role,
+            action: 'UPDATE_SETTINGS',
+            target_type: 'site_settings',
+            target_id: '1',
+            summary: `Memperbarui pengaturan sistem PSB (Gelombang: ${wave_name || 'Standar'}, Sekolah: ${school_name})`,
+            metadata: {
+                is_open_manual,
+                use_auto_schedule,
+                wave_name,
+                school_name,
+                major_quotas: quotasPayload,
+            },
+        });
 
         return NextResponse.json({ message: 'Pengaturan disimpan' });
     } catch (error) {
