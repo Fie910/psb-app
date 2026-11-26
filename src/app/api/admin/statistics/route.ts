@@ -1,6 +1,6 @@
 // src/app/api/admin/statistics/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
+import { getDb, withDbRetry } from '@/lib/db';
 import { requireAdminRole } from '@/lib/auth/server';
 
 const DEFAULT_QUOTAS: Record<string, number> = {
@@ -21,16 +21,16 @@ export async function GET(request: NextRequest) {
 
         // 1. Settings & major_quotas
         let schoolName = 'SMK KH. A. WAHAB MUHSIN';
-        let academicYear = '2026/2027';
+        let academicYear = '2027/2028';
         let majorQuotas: Record<string, number> = { ...DEFAULT_QUOTAS };
 
         try {
-            const settingsRows = await sql`
+            const settingsRows = await withDbRetry(() => sql`
                 SELECT *
                 FROM site_settings
                 ORDER BY id ASC
                 LIMIT 1
-            `;
+            `);
             if (settingsRows.length > 0) {
                 const s = settingsRows[0];
                 if (s.school_name) schoolName = s.school_name;

@@ -20,7 +20,8 @@ export async function ensureReRegistrationSchema(sql: NeonQueryFunction<false, f
             ADD COLUMN IF NOT EXISTS payment_tutorial_youtube_url TEXT,
             ADD COLUMN IF NOT EXISTS major_quotas JSONB DEFAULT '{"Farmasi Klinis dan Komunitas": 72, "Produksi dan Siaran Program Televisi": 36, "Manajemen Perkantoran": 72}'::jsonb,
             ADD COLUMN IF NOT EXISTS allowed_registration_paths VARCHAR(20) NOT NULL DEFAULT 'ALL',
-            ADD COLUMN IF NOT EXISTS virtual_background_url TEXT
+            ADD COLUMN IF NOT EXISTS virtual_background_url TEXT,
+            ADD COLUMN IF NOT EXISTS academic_year VARCHAR(25) NOT NULL DEFAULT '2027/2028'
         `;
 
         await sql`

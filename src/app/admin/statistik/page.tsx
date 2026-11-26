@@ -187,7 +187,7 @@ export default function AdminStatistikPage() {
                                 <span>Statistik &amp; Laporan Pleno Eksekutif</span>
                             </h1>
                             <p className="text-xs opacity-75">
-                                {data?.schoolName || 'SMK KH. A. WAHAB MUHSIN'} &bull; Tahun Ajaran {data?.academicYear || '2026/2027'}
+                                {data?.schoolName || 'SMK KH. A. WAHAB MUHSIN'} &bull; Tahun Ajaran {data?.academicYear || '2027/2028'}
                             </p>
                         </div>
                     </div>
@@ -247,7 +247,7 @@ export default function AdminStatistikPage() {
                         Laporan Pleno Eksekutif PPDB &mdash; {data?.schoolName || 'SMK KH. A. WAHAB MUHSIN'}
                     </h1>
                     <p className="text-xs mt-1">
-                        Tahun Ajaran {data?.academicYear || '2026/2027'} &bull; Filter Jalur:{' '}
+                        Tahun Ajaran {data?.academicYear || '2027/2028'} &bull; Filter Jalur:{' '}
                         {pathFilter === 'ALL' ? 'Semua Jalur' : pathFilter} &bull; Dicetak:{' '}
                         {new Date().toLocaleString('id-ID')}
                     </p>

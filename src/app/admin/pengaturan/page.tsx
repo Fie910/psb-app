@@ -62,6 +62,7 @@ export default function PengaturanPage() {
         payment_portal_url: 'https://gosiswa.com',
         payment_tutorial_youtube_url: '',
         school_name: '',
+        academic_year: '2027/2028',
         foundation_name: '',
         school_address: '',
         school_city: '',
@@ -103,6 +104,7 @@ export default function PengaturanPage() {
                         payment_portal_url: s.payment_portal_url || 'https://gosiswa.com',
                         payment_tutorial_youtube_url: s.payment_tutorial_youtube_url || '',
                         school_name: s.school_name || '',
+                        academic_year: s.academic_year || '2027/2028',
                         foundation_name: s.foundation_name || '',
                         school_address: s.school_address || '',
                         school_city: s.school_city || '',
@@ -263,6 +265,10 @@ export default function PengaturanPage() {
                             <div>
                                 <label className={`block text-xs sm:text-sm font-bold mb-1 ${labelCls}`}>Nama Sekolah</label>
                                 <input type="text" name="school_name" value={formData.school_name} onChange={handleChange} className={`w-full p-2.5 rounded-xl border text-sm font-medium ${inputCls}`} />
+                            </div>
+                            <div>
+                                <label className={`block text-xs sm:text-sm font-bold mb-1 ${labelCls}`}>Tahun Ajaran</label>
+                                <input type="text" name="academic_year" value={formData.academic_year} onChange={handleChange} placeholder="2027/2028" className={`w-full p-2.5 rounded-xl border text-sm font-medium ${inputCls}`} />
                             </div>
                             <div className="sm:col-span-2">
                                 <label className={`block text-xs sm:text-sm font-bold mb-1 ${labelCls}`}>Alamat Lengkap</label>

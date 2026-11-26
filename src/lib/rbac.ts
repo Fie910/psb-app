@@ -1,5 +1,5 @@
 //src/lib/rbac.ts
-import { getDb } from '@/lib/db';
+import { getDb, withDbRetry } from '@/lib/db';
 
 export type PanitiaRole = 'super_admin' | 'verifikator' | 'pewawancara' | 'bendahara';
 
@@ -78,11 +78,11 @@ export async function getAdminRole(userId: string, email?: string | null): Promi
         const sql = getDb();
         await ensureAdminRolesSchema(sql);
 
-        const rows = await sql`
+        const rows = await withDbRetry(() => sql`
             SELECT role FROM admin_roles 
             WHERE user_id = ${userId} OR (email = ${email || ''} AND ${Boolean(email)})
             LIMIT 1
-        `;
+        `);
 
         if (rows.length > 0 && rows[0].role) {
             const role = rows[0].role as PanitiaRole;
@@ -91,13 +91,15 @@ export async function getAdminRole(userId: string, email?: string | null): Promi
             }
         }
 
-        // Bootstrap: jika belum ada super_admin sama sekali di admin_roles, jadikan akun pertama ini super_admin
-        const countRows = await sql`
-            SELECT COUNT(*)::int AS cnt FROM admin_roles WHERE role = 'super_admin'
-        `;
-        if (Number(countRows[0]?.cnt || 0) === 0 && userId) {
-            await setAdminRole(userId, email || '', 'Super Admin', 'super_admin');
-            return 'super_admin';
+        // Bootstrap: hanya jika SUPER_ADMIN_EMAILS belum diset dan belum ada super_admin sama sekali di admin_roles
+        if (superAdminList.length === 0 && userId) {
+            const countRows = await withDbRetry(() => sql`
+                SELECT COUNT(*)::int AS cnt FROM admin_roles WHERE role = 'super_admin'
+            `);
+            if (Number(countRows[0]?.cnt || 0) === 0) {
+                await setAdminRole(userId, email || '', 'Super Admin', 'super_admin');
+                return 'super_admin';
+            }
         }
     } catch (err) {
         console.warn('Warning: Gagal mengambil admin role dari database:', err);

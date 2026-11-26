@@ -719,9 +719,9 @@ Orang Tua / Wali Siswa                          Calon Peserta Didik Baru,( _____
                                             className="w-28 h-36 object-cover rounded-xl border-2 border-[#b85c38] shadow-md"
                                         />
                                     ) : (
-                                    <div className="w-28 h-36 rounded-xl bg-gray-200 dark:bg-gray-800 flex items-center justify-center text-xs font-bold text-gray-500">
-                                        Pas Foto 3x4
-                                    </div>
+                                        <div className="w-28 h-36 rounded-xl bg-gray-200 dark:bg-gray-800 flex items-center justify-center text-xs font-bold text-gray-500">
+                                            Pas Foto 3x4
+                                        </div>
                                     )}
                                     <span className="mt-2.5 text-xs font-mono font-extrabold px-2.5 py-0.5 rounded-full bg-[#b85c38]/15 text-[#8f3f20] dark:bg-teal-500/20 dark:text-teal-300">
                                         {applicant.registration_number}

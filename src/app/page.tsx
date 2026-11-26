@@ -96,8 +96,8 @@ export default function LandingPage() {
                     </h1>
 
                     <p className={`text-lg sm:text-xl mb-8 ${isDarkMode ? 'text-gray-300' : 'text-[#4a342a]'}`}>
-                        Penerimaan Siswa Baru SMK KH. A. WAHAB MUHSIN Tahun Ajaran 2026/2027.
-                        Tersedia Jurusan Farmasi, Penyiaran TV, dan Manajemen Perkantoran.
+                        Penerimaan Siswa Baru SMK KH. A. WAHAB MUHSIN Tahun Ajaran 2027/2028.
+                        Jurusan Farmasi, Penyiaran TV - Multimedia, dan Manajemen Perkantoran.
                     </p>
 
                     <div className="flex flex-col sm:flex-row justify-center gap-4">
