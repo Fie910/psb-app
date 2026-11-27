@@ -91,13 +91,15 @@ export default function LandingPage() {
                     </span>
 
                     <h1 className={`text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight mb-6 ${isDarkMode ? 'text-white' : 'text-[#2b1d18]'}`}>
-                        Wujudkan Masa Depan <br />
-                        <span className={isDarkMode ? 'text-teal-400' : 'text-[#8f472a]'}>Cerah Bersama Kami.</span>
+                        Bukan Sekadar Siap Kerja, <br />
+                        <span className={isDarkMode ? 'text-teal-400' : 'text-[#8f472a]'}>Melainkan Siap Bermakna.</span>
                     </h1>
 
                     <p className={`text-lg sm:text-xl mb-8 ${isDarkMode ? 'text-gray-300' : 'text-[#4a342a]'}`}>
-                        Penerimaan Siswa Baru SMK KH. A. WAHAB MUHSIN Tahun Ajaran 2027/2028.
-                        Jurusan Farmasi, Penyiaran TV - Multimedia, dan Manajemen Perkantoran.
+                        Menumbuh-kembangkan generasi vokasi yang berakhlakul karimah, tangguh menghadapi zaman, dan profesional di bidangnya. <br />
+                        <br />
+                        Penerimaan Siswa Baru SMK KH. A. WAHAB MUHSIN Tahun Ajaran 2027/2028. <br />
+                        Farmasi Klinis & Komunitas • Multimedia - Produksi & Siaran Program Televisi • Manajemen Perkantoran
                     </p>
 
                     <div className="flex flex-col sm:flex-row justify-center gap-4">
