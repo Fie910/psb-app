@@ -1,15 +1,34 @@
-//src/app/api/register/route.ts
+// src/app/api/register/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
+import { getDb, withDbRetry } from '@/lib/db';
+import { ensureReferralSchema } from '@/lib/referral-schema';
 import { ensureReRegistrationSchema, normalizeAllowedPaths } from '@/lib/rereg-schema';
 import { createAdminNotification } from '@/lib/notifications';
 
 export async function POST(request: NextRequest) {
     try {
         const sql = getDb();
-        await ensureReRegistrationSchema(sql);
+        await withDbRetry(async () => {
+            await ensureReferralSchema(sql);
+            await ensureReRegistrationSchema(sql);
+        });
 
         const body = await request.json();
+        const rawRefInput = body.referral_code ?? body.referralCode ?? '';
+        const rawReferralCode = typeof rawRefInput === 'string' ? rawRefInput.trim().toUpperCase() : '';
+        let validReferralCode: string | null = null;
+        if (rawReferralCode) {
+            const refRows = await withDbRetry(() => sql`
+                SELECT code, status FROM referral_codes WHERE UPPER(TRIM(code)) = ${rawReferralCode} LIMIT 1
+            `);
+            if (refRows.length === 0) {
+                return NextResponse.json({ error: 'Kode referal tidak ditemukan.' }, { status: 400 });
+            }
+            if (refRows[0].status !== 'active') {
+                return NextResponse.json({ error: 'Kode referal belum aktif atau masih menunggu persetujuan admin.' }, { status: 400 });
+            }
+            validReferralCode = String(refRows[0].code).trim().toUpperCase();
+        }
         const {
             full_name,
             nisn,
@@ -36,12 +55,12 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Scan Kartu Keluarga (KK) dan Akta Kelahiran wajib diunggah.' }, { status: 400 });
         }
 
-        const settingsRows = await sql`
+        const settingsRows = await withDbRetry(() => sql`
             SELECT wave_name, allowed_registration_paths, is_open_manual, use_auto_schedule, reg_start, reg_end
             FROM site_settings
-            WHERE id = 1
+            ORDER BY id ASC
             LIMIT 1
-        `;
+        `);
         const settings = settingsRows[0] || null;
         const allowedPaths = normalizeAllowedPaths(settings?.allowed_registration_paths);
         const waveName = settings?.wave_name || 'Gelombang Aktif';
@@ -98,11 +117,19 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Email sudah terdaftar di sistem.' }, { status: 409 });
         }
 
-        const year = new Date().getFullYear();
+        const yearShort = String(new Date().getFullYear()).slice(-2);
+        const ALPHANUM_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+        const genCode = (len: number) => {
+            let out = '';
+            for (let i = 0; i < len; i++) {
+                out += ALPHANUM_CHARS[Math.floor(Math.random() * ALPHANUM_CHARS.length)];
+            }
+            return out;
+        };
+
         let registrationNumber = '';
-        for (let attempt = 0; attempt < 5; attempt++) {
-            const rand = Math.floor(1000 + Math.random() * 9000);
-            const candidate = `PSB-${year}-${rand}`;
+        for (let attempt = 0; attempt < 8; attempt++) {
+            const candidate = `PSB-${yearShort}-${genCode(5)}`;
             const checkReg = await sql`SELECT id FROM applicants WHERE registration_number = ${candidate} LIMIT 1`;
             if (checkReg.length === 0) {
                 registrationNumber = candidate;
@@ -110,7 +137,7 @@ export async function POST(request: NextRequest) {
             }
         }
         if (!registrationNumber) {
-            registrationNumber = `PSB-${year}-${Date.now().toString().slice(-5)}`;
+            registrationNumber = `PSB-${yearShort}-${genCode(5)}`;
         }
 
         const inserted = await sql`
@@ -128,6 +155,7 @@ export async function POST(request: NextRequest) {
                 registration_path,
                 school_choice,
                 school_choice_2,
+                referral_code,
                 document_kk,
                 document_akta,
                 document_prestasi,
@@ -146,12 +174,13 @@ export async function POST(request: NextRequest) {
                 ${submittedPath},
                 ${school_choice},
                 ${school_choice_2 || null},
+                ${validReferralCode},
                 ${document_kk},
                 ${document_akta},
                 ${submittedPath === 'Prestasi' ? document_prestasi : null},
                 'Pending'
             )
-            RETURNING id, registration_number, full_name, school_choice, registration_path
+            RETURNING id, registration_number, full_name, school_choice, registration_path, referral_code
         `;
 
         const newApplicant = inserted[0];
@@ -172,6 +201,7 @@ export async function POST(request: NextRequest) {
                 full_name: newApplicant.full_name,
                 school_choice: newApplicant.school_choice,
                 registration_path: newApplicant.registration_path,
+                referral_code: newApplicant.referral_code || null,
             },
             { status: 201 }
         );

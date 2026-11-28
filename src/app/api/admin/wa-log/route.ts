@@ -41,11 +41,12 @@ export async function POST(request: NextRequest) {
         const senderName = authCheck.user.name || 'Panitia';
         const now = new Date().toISOString();
 
-        // Ambil data peserta
+        // Ambil data peserta beserta kontak referal jika ada
         const appRows = await sql`
-            SELECT id, registration_number, full_name, status, phone, parent_phone
-            FROM applicants
-            WHERE id = ${applicantId}
+            SELECT a.id, a.registration_number, a.full_name, a.status, a.phone, a.parent_phone, rc.referrer_phone
+            FROM applicants a
+            LEFT JOIN referral_codes rc ON UPPER(TRIM(a.referral_code)) = rc.code
+            WHERE a.id = ${applicantId}
             LIMIT 1
         `;
 
@@ -54,6 +55,12 @@ export async function POST(request: NextRequest) {
         }
 
         const app = appRows[0];
+        const fallbackPhone =
+            recipientType === 'referrer'
+                ? app.referrer_phone
+                : recipientType === 'parent'
+                    ? app.parent_phone
+                    : app.phone;
 
         // Update tracking WA pada tabel applicants
         await sql`
@@ -61,7 +68,7 @@ export async function POST(request: NextRequest) {
             SET 
                 last_wa_sent_at = CURRENT_TIMESTAMP,
                 last_wa_sent_by = ${senderName},
-                last_wa_recipient = ${recipientPhone || (recipientType === 'parent' ? app.parent_phone : app.phone) || null}
+                last_wa_recipient = ${recipientPhone || fallbackPhone || null}
             WHERE id = ${applicantId}
         `;
 

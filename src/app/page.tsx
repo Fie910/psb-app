@@ -63,6 +63,12 @@ export default function LandingPage() {
                 </div>
                 <div className="flex items-center gap-3">
                     <Link
+                        href="/referal"
+                        className={`text-sm font-semibold transition-colors hover:underline ${isDarkMode ? 'text-emerald-300 hover:text-emerald-200' : 'text-emerald-800 hover:text-emerald-950'}`}
+                    >
+                        Program Referal Guru
+                    </Link>
+                    <Link
                         href="/cek-status"
                         className={`text-sm font-semibold transition-colors hover:underline ${isDarkMode ? 'text-gray-300 hover:text-white' : 'text-[#4a342a] hover:text-[#b85c38]'}`}
                     >
@@ -96,9 +102,9 @@ export default function LandingPage() {
                     </h1>
 
                     <p className={`text-lg sm:text-xl mb-8 ${isDarkMode ? 'text-gray-300' : 'text-[#4a342a]'}`}>
-                        Menumbuh-kembangkan generasi vokasi yang berakhlakul karimah, tangguh menghadapi zaman, dan profesional di bidangnya. <br />
+                        Menumbuh-kembangkan generasi vokasi yang berakhlakul karimah, tangguh menghadapi zaman, dan profesional di bidangnya.. <br />
                         <br />
-                        Penerimaan Siswa Baru SMK KH. A. WAHAB MUHSIN Tahun Ajaran 2027/2028. <br />
+                        Penerimaan Siswa Baru {settings?.school_name || 'SMK KH. A. WAHAB MUHSIN'} Tahun Ajaran {settings?.academic_year || '2027/2028'} <br />
                         Farmasi Klinis & Komunitas • Multimedia - Produksi & Siaran Program Televisi • Manajemen Perkantoran
                     </p>
 

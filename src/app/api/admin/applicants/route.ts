@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { requireAdminAuth } from '@/lib/auth/server';
 import { ensureReRegistrationSchema } from '@/lib/rereg-schema';
+import { ensureReferralSchema } from '@/lib/referral-schema';
 
 export async function GET() {
   const authCheck = await requireAdminAuth();
@@ -41,6 +42,8 @@ export async function GET() {
         a.accepted_major, a.accepted_at,
         a.interview_recommendation, a.interview_notes,
         a.last_wa_sent_at, a.last_wa_sent_by, a.last_wa_recipient,
+        a.referral_code, rc.referrer_name, rc.referrer_phone,
+        rc.origin_school as referrer_school, rc.jabatan as referrer_jabatan, rc.status as referral_status,
         r.id as rereg_id,
         r.rereg_status,
         r.rereg_notes,
@@ -82,6 +85,7 @@ export async function GET() {
         r.submitted_at as rereg_submitted_at,
         r.verified_at as rereg_verified_at
       FROM applicants a
+      LEFT JOIN referral_codes rc ON UPPER(TRIM(a.referral_code)) = rc.code
       LEFT JOIN re_registrations r ON r.applicant_id = a.id
       ORDER BY a.created_at DESC
     `;

@@ -1,14 +1,23 @@
-//src/app/api/settings/route.ts
+// src/app/api/settings/route.ts
 import { NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
+import { getDb, withDbRetry } from '@/lib/db';
 import { ensureReRegistrationSchema } from '@/lib/rereg-schema';
+import { ensureReferralSchema } from '@/lib/referral-schema';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET() {
     try {
         const sql = getDb();
-        await ensureReRegistrationSchema(sql);
+        await withDbRetry(async () => {
+            await ensureReRegistrationSchema(sql);
+            await ensureReferralSchema(sql);
+        });
 
-        const result = await sql`SELECT * FROM site_settings WHERE id = 1`;
+        const result = await withDbRetry(() => sql`
+            SELECT * FROM site_settings ORDER BY id ASC LIMIT 1
+        `);
+
         return NextResponse.json({ settings: result[0] || null });
     } catch (error) {
         console.error('Error fetch settings:', error);

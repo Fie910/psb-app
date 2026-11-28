@@ -1,4 +1,4 @@
-//src/app/api/exam/fetch/route.ts
+// src/app/api/exam/fetch/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 
@@ -9,10 +9,10 @@ export async function POST(request: NextRequest) {
 
         // 1. Validasi Siswa & Tanggal
         const applicant = await sql`
-      SELECT id, full_name, TO_CHAR(test_date, 'YYYY-MM-DD') as test_date_str 
-      FROM applicants 
-      WHERE nisn = ${nisn} AND tanggal_lahir = ${tanggal_lahir} LIMIT 1
-    `;
+            SELECT id, full_name, TO_CHAR(test_date, 'YYYY-MM-DD') as test_date_str 
+            FROM applicants 
+            WHERE nisn = ${nisn} AND tanggal_lahir = ${tanggal_lahir} LIMIT 1
+        `;
 
         if (applicant.length === 0) {
             return NextResponse.json({ error: 'Data NISN atau Tanggal Lahir tidak ditemukan.' }, { status: 404 });
@@ -24,18 +24,16 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Anda belum memiliki jadwal tes.' }, { status: 403 });
         }
 
-        const today = new Date();
-        const offset = today.getTimezoneOffset() * 60000;
-        const todayStr = (new Date(today.getTime() - offset)).toISOString().slice(0, 10);
+        const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date());
 
         if (app.test_date_str !== todayStr) {
             return NextResponse.json({ error: `Anda hanya bisa mengerjakan tes pada tanggal ${app.test_date_str}.` }, { status: 403 });
         }
 
         // 2. Validasi Pengaturan
-        const settings = await sql`SELECT active_tests, test_durations FROM site_settings WHERE id = 1`;
-        const activeTests = settings[0].active_tests || [];
-        const durations = settings[0].test_durations || {};
+        const settings = await sql`SELECT active_tests, test_durations FROM site_settings ORDER BY id ASC LIMIT 1`;
+        const activeTests = settings[0]?.active_tests || [];
+        const durations = settings[0]?.test_durations || {};
 
         if (!activeTests.includes(category)) {
             return NextResponse.json({ error: 'Tes ini tidak diaktifkan oleh panitia.' }, { status: 403 });
@@ -43,9 +41,9 @@ export async function POST(request: NextRequest) {
 
         // 3. Cek Sesi Ujian & Hitung Sisa Waktu
         const existingResult = await sql`
-      SELECT id, status, question_order, started_at FROM exam_results 
-      WHERE applicant_id = ${app.id} AND category = ${category}
-    `;
+            SELECT id, status, question_order, started_at FROM exam_results 
+            WHERE applicant_id = ${app.id} AND category = ${category}
+        `;
 
         if (existingResult.length > 0 && existingResult[0].status === 'Selesai') {
             return NextResponse.json({ error: 'Anda sudah menyelesaikan tes ini.' }, { status: 403 });
@@ -60,7 +58,6 @@ export async function POST(request: NextRequest) {
             const elapsedSeconds = Math.floor((now - startTime) / 1000);
             remainingSeconds = ((durations[category] || 30) * 60) - elapsedSeconds;
 
-            // Jika waktu sudah habis
             if (remainingSeconds <= 0) {
                 await sql`UPDATE exam_results SET status = 'Selesai' WHERE id = ${existingResult[0].id}`;
                 return NextResponse.json({ error: 'Waktu ujian Anda sudah habis.' }, { status: 403 });
@@ -72,7 +69,7 @@ export async function POST(request: NextRequest) {
         let questionOrder = existingResult.length > 0 ? existingResult[0].question_order : null;
 
         if (typeof questionOrder === 'string') {
-            try { questionOrder = JSON.parse(questionOrder); } catch (e) { questionOrder = null; }
+            try { questionOrder = JSON.parse(questionOrder); } catch { questionOrder = null; }
         }
 
         if (!questionOrder || !Array.isArray(questionOrder) || questionOrder.length === 0) {
@@ -85,16 +82,15 @@ export async function POST(request: NextRequest) {
                 questionOrder = allQ.map((q: any) => Number(q.id));
             }
 
-            // Simpan sesi baru
             if (isNewSession) {
                 await sql`
-          INSERT INTO exam_results (applicant_id, category, status, question_order, started_at) 
-          VALUES (${app.id}, ${category}, 'Sedang Mengerjakan', ${JSON.stringify(questionOrder)}::jsonb, CURRENT_TIMESTAMP)
-        `;
+                    INSERT INTO exam_results (applicant_id, category, status, question_order, started_at) 
+                    VALUES (${app.id}, ${category}, 'Sedang Mengerjakan', ${JSON.stringify(questionOrder)}::jsonb, CURRENT_TIMESTAMP)
+                `;
             } else {
                 await sql`
-          UPDATE exam_results SET question_order = ${JSON.stringify(questionOrder)}::jsonb WHERE id = ${existingResult[0].id}
-        `;
+                    UPDATE exam_results SET question_order = ${JSON.stringify(questionOrder)}::jsonb WHERE id = ${existingResult[0].id}
+                `;
             }
         }
 
@@ -102,23 +98,25 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Bank soal untuk tes ini masih kosong.' }, { status: 404 });
         }
 
-        // 5. Ambil Soal & Jawaban Sebelumnya
+        // 5. Ambil Soal (tanpa kolom correct_answer) & Jawaban Sebelumnya
         const rawQuestions = await sql`
-      SELECT * FROM exam_questions WHERE id = ANY(${questionOrder}::int[])
-    `;
+            SELECT id, question_code, category, dimension, type, question_text, options
+            FROM exam_questions
+            WHERE id = ANY(${questionOrder}::int[])
+        `;
 
         questions = questionOrder.map((id: number) =>
             rawQuestions.find((q: any) => Number(q.id) === Number(id))
         ).filter(Boolean);
 
         const existingAnswers = await sql`
-      SELECT question_id, answer_value FROM exam_answers WHERE applicant_id = ${app.id}
-    `;
+            SELECT question_id, answer_value FROM exam_answers WHERE applicant_id = ${app.id}
+        `;
 
         // 6. Kembalikan Data beserta Sisa Waktu
         return NextResponse.json({
             questions,
-            remainingSeconds, // Kirim sisa waktu, bukan durasi total
+            remainingSeconds,
             existingAnswers,
             applicant_id: app.id,
             full_name: app.full_name

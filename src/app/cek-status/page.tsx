@@ -907,7 +907,7 @@ export default function CekStatusPage() {
                     </div>
 
                     <div className="text-base leading-relaxed space-y-4">
-                        <p>Berdasarkan hasil seleksi Penerimaan Siswa Baru (PSB) {siteSettings?.school_name} Tahun Ajaran {new Date().getFullYear()}/{new Date().getFullYear() + 1}, dengan ini Panitia menyatakan bahwa:</p>
+                        <p>Berdasarkan hasil seleksi Penerimaan Siswa Baru (PSB) {siteSettings?.school_name} Tahun Ajaran {(siteSettings as any)?.academic_year || '2027/2028'}, dengan ini Panitia menyatakan bahwa:</p>
                         <table className="w-full ml-8">
                             <tbody>
                                 <tr><td className="w-40 py-1 font-semibold">Nama Lengkap</td><td className="w-4">:</td><td className="font-bold uppercase">{applicant.full_name}</td></tr>

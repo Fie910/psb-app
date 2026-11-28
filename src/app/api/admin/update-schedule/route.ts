@@ -1,10 +1,11 @@
 //src/app/api/admin/update-schedule/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
-import { requireAdminAuth } from '@/lib/auth/server';
+import { requireAdminRole } from '@/lib/auth/server';
+import { logAdminAudit } from '@/lib/audit-log';
 
 export async function PUT(request: NextRequest) {
-  const authCheck = await requireAdminAuth();
+  const authCheck = await requireAdminRole(['super_admin', 'verifikator']);
   if (!authCheck.authorized) return authCheck.response;
 
   try {

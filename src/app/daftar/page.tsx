@@ -1,4 +1,4 @@
-//src/app/daftar/page.tsx
+// src/app/daftar/page.tsx
 'use client';
 
 import { useForm } from 'react-hook-form';
@@ -10,6 +10,7 @@ import QRCode from 'react-qr-code';
 import toast, { Toaster } from 'react-hot-toast';
 import { useTheme } from '@/context/ThemeContext';
 import ThemeToggle from '@/components/ThemeToggle';
+import ReferralInputWithScanner from '@/components/ReferralInputWithScanner';
 import { normalizeAllowedPaths } from '@/lib/rereg-schema';
 import {
   Printer,
@@ -44,6 +45,8 @@ type FormData = z.infer<typeof schema>;
 
 export default function Home() {
   const { isDarkMode } = useTheme();
+  const [referralCode, setReferralCode] = useState('');
+  const [isReferralValid, setIsReferralValid] = useState(true);
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
@@ -82,14 +85,12 @@ export default function Home() {
           const normalized = normalizeAllowedPaths(s.allowed_registration_paths);
           setAllowedPaths(normalized);
 
-          // Jika salah satu jalur dikunci oleh panitia, paksa nilai registration_path sesuai ketentuan gelombang
           if (normalized === 'Prestasi') {
             setValue('registration_path', 'Prestasi', { shouldValidate: true });
           } else if (normalized === 'Reguler') {
             setValue('registration_path', 'Reguler', { shouldValidate: true });
           }
 
-          // Cek status buka/tutup pendaftaran
           let isOpen = Boolean(s.is_open_manual);
           if (s.use_auto_schedule && s.reg_start && s.reg_end) {
             const today = new Date().toISOString().split('T')[0];
@@ -126,8 +127,17 @@ export default function Home() {
     setMessage({ type: '', text: '' });
     setUploadStatus('');
 
-    // Pastikan jalur yang dikirim mematuhi penguncian gelombang
     const effectivePath = allowedPaths === 'ALL' ? data.registration_path : allowedPaths;
+    const normalizedReferral = referralCode.trim().toUpperCase();
+
+    if (normalizedReferral && !isReferralValid) {
+      setMessage({
+        type: 'error',
+        text: 'Kode referal tidak valid atau belum aktif. Perbaiki atau kosongkan kolom referal terlebih dahulu.',
+      });
+      setIsSubmitting(false);
+      return;
+    }
 
     if (!fileKK || !fileAkta) {
       setMessage({ type: 'error', text: 'Kartu Keluarga dan Akta wajib diunggah.' });
@@ -208,6 +218,7 @@ export default function Home() {
         body: JSON.stringify({
           ...data,
           registration_path: effectivePath,
+          referral_code: normalizedReferral || null,
           document_kk: keyKK,
           document_akta: keyAkta,
           document_prestasi: keyPrestasi,
@@ -225,6 +236,8 @@ export default function Home() {
         reset({
           registration_path: allowedPaths === 'ALL' ? 'Reguler' : allowedPaths,
         });
+        setReferralCode('');
+        setIsReferralValid(true);
         setFileKK(null);
         setFileAkta(null);
         setFilePrestasi(null);
@@ -567,6 +580,13 @@ export default function Home() {
                 </select>
               </div>
             </div>
+
+            <ReferralInputWithScanner
+              value={referralCode}
+              onChange={setReferralCode}
+              onValidationChange={setIsReferralValid}
+              isDarkMode={isDarkMode}
+            />
 
             {/* Upload Berkas */}
             <div className={`p-4 rounded-xl border ${isDarkMode ? 'bg-gray-700/30 border-gray-600/50' : 'bg-white/50 border-[#d6c5b3]'}`}>

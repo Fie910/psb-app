@@ -23,6 +23,11 @@ export interface WhatsAppApplicantData {
     last_wa_sent_at?: string | null;
     last_wa_sent_by?: string | null;
     last_wa_recipient?: string | null;
+    referral_code?: string | null;
+    referrer_name?: string | null;
+    referrer_phone?: string | null;
+    referrer_school?: string | null;
+    referrer_jabatan?: string | null;
 }
 
 export interface WhatsAppSiteSettings {
@@ -98,7 +103,8 @@ function parseRevisionFields(raw?: string[] | string | null): string[] {
 export function buildWhatsAppMessage(
     applicant: WhatsAppApplicantData,
     settings?: WhatsAppSiteSettings | null,
-    originUrl?: string
+    originUrl?: string,
+    recipientType: 'student' | 'parent' | 'referrer' = 'student'
 ): string {
     const schoolName = settings?.school_name || 'SMK KH. A. Wahab Muhsin';
     const portalPaymentUrl = settings?.payment_portal_url || 'https://gosiswa.com';
@@ -109,9 +115,16 @@ export function buildWhatsAppMessage(
             : 'https://pmb.smk-khawahabmuhsin.sch.id');
 
     const regNo = applicant.registration_number ? ' (' + applicant.registration_number + ')' : '';
+    const refInfo = applicant.referral_code ? ' [Kode Referal: ' + applicant.referral_code + ']' : '';
     const header =
-        "Assalamu'alaikum Wr. Wb.\n" +
-        'Yth. Calon Peserta Didik / Orang Tua dari *' + applicant.full_name + '*' + regNo + ',\n\n';
+        recipientType === 'referrer'
+            ? "Assalamu'alaikum Wr. Wb.\n" +
+              'Yth. Bapak/Ibu ' + (applicant.referrer_name || 'Guru / Wali Kelas') +
+              (applicant.referrer_jabatan ? ' (' + applicant.referrer_jabatan + ')' : '') + ',\n' +
+              'Kami menginformasikan perkembangan pendaftaran siswa bimbingan/referal Anda atas nama *' +
+              applicant.full_name + '*' + regNo + refInfo + ':\n\n'
+            : "Assalamu'alaikum Wr. Wb.\n" +
+              'Yth. Calon Peserta Didik / Orang Tua dari *' + applicant.full_name + '*' + regNo + ',\n\n';
     const footer = '\n\nHormat kami,\n*Panitia PSB ' + schoolName + '*';
 
     if (applicant.status === 'Perbaikan') {

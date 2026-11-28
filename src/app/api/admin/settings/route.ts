@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { requireAdminRole } from '@/lib/auth/server';
 import { ensureReRegistrationSchema, normalizeAllowedPaths } from '@/lib/rereg-schema';
+import { ensureReferralSchema } from '@/lib/referral-schema';
 import { logAdminAudit } from '@/lib/audit-log';
 
 export async function PUT(request: NextRequest) {
@@ -12,6 +13,7 @@ export async function PUT(request: NextRequest) {
     try {
         const sql = getDb();
         await ensureReRegistrationSchema(sql);
+        await ensureReferralSchema(sql);
 
         const body = await request.json();
         const {
@@ -45,6 +47,7 @@ export async function PUT(request: NextRequest) {
             headmaster_nip,
             logo_url,
             virtual_background_url,
+            referral_auto_approve,
         } = body;
 
         const cleanAllowedPaths = normalizeAllowedPaths(allowed_registration_paths);
@@ -93,7 +96,8 @@ export async function PUT(request: NextRequest) {
                 headmaster_name = ${headmaster_name},
                 headmaster_nip = ${headmaster_nip},
                 logo_url = ${logo_url},
-                virtual_background_url = ${virtual_background_url || null}
+                virtual_background_url = ${virtual_background_url || null},
+                referral_auto_approve = ${Boolean(referral_auto_approve)}
             WHERE id = 1
         `;
 

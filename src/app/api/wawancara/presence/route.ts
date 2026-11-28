@@ -1,6 +1,7 @@
 // src/app/api/wawancara/presence/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
+import { requireAdminAuth } from '@/lib/auth/server';
 
 let presenceSchemaEnsured = false;
 
@@ -62,6 +63,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
+    const authCheck = await requireAdminAuth();
+    if (!authCheck.authorized) return authCheck.response;
+
     try {
         const sql = getDb();
         await ensurePresenceSchema(sql);

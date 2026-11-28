@@ -27,28 +27,46 @@ export default function AdminWhatsAppButton({ applicant, settings, onWaLogged }:
 
     const studentPhone = normalizeIndonesianPhone(applicant.phone);
     const parentPhone = normalizeIndonesianPhone(applicant.parent_phone);
+    const referrerPhone = normalizeIndonesianPhone(applicant.referrer_phone);
 
-    const [recipientType, setRecipientType] = useState<'student' | 'parent'>(
-        studentPhone ? 'student' : 'parent'
+    const [recipientType, setRecipientType] = useState<'student' | 'parent' | 'referrer'>(
+        studentPhone ? 'student' : parentPhone ? 'parent' : 'referrer'
     );
 
+    const [hasManualEdit, setHasManualEdit] = useState(false);
+
     const defaultMessage = useMemo(
-        () => buildWhatsAppMessage(applicant, settings),
-        [applicant, settings]
+        () => buildWhatsAppMessage(applicant, settings, undefined, recipientType),
+        [applicant, settings, recipientType]
     );
 
     const [customMessage, setCustomMessage] = useState(defaultMessage);
 
     const handleOpenModal = () => {
-        setRecipientType(studentPhone ? 'student' : 'parent');
-        setCustomMessage(buildWhatsAppMessage(applicant, settings));
+        const initialType: 'student' | 'parent' | 'referrer' = studentPhone
+            ? 'student'
+            : parentPhone
+                ? 'parent'
+                : 'referrer';
+        setRecipientType(initialType);
+        setHasManualEdit(false);
+        setCustomMessage(buildWhatsAppMessage(applicant, settings, undefined, initialType));
         setIsOpen(true);
+    };
+
+    const handleSelectRecipient = (nextType: 'student' | 'parent' | 'referrer') => {
+        setRecipientType(nextType);
+        if (!hasManualEdit) {
+            setCustomMessage(buildWhatsAppMessage(applicant, settings, undefined, nextType));
+        }
     };
 
     const activePhone =
         recipientType === 'student'
-            ? studentPhone || parentPhone
-            : parentPhone || studentPhone;
+            ? studentPhone
+            : recipientType === 'parent'
+                ? parentPhone
+                : referrerPhone;
 
     const handleCopyMessage = async () => {
         try {
@@ -98,7 +116,7 @@ export default function AdminWhatsAppButton({ applicant, settings, onWaLogged }:
         }
     };
 
-    const hasAnyPhone = Boolean(studentPhone || parentPhone);
+    const hasAnyPhone = Boolean(studentPhone || parentPhone || referrerPhone);
 
     return (
         <div className="flex flex-col items-start gap-1">
@@ -163,12 +181,12 @@ export default function AdminWhatsAppButton({ applicant, settings, onWaLogged }:
                             <label className="block text-xs font-extrabold mb-1.5">
                                 Pilih Nomor WhatsApp Tujuan:
                             </label>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                                 <button
                                     type="button"
                                     disabled={!studentPhone}
-                                    onClick={() => setRecipientType('student')}
-                                    className={`p-2.5 rounded-xl border text-left text-xs transition-all disabled:opacity-40 ${recipientType === 'student' && studentPhone
+                                    onClick={() => handleSelectRecipient('student')}
+                                    className={`p-2.5 rounded-xl border text-left text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed ${recipientType === 'student' && studentPhone
                                             ? 'bg-emerald-600/15 border-emerald-500 font-extrabold'
                                             : isDarkMode
                                                 ? 'bg-gray-950/60 border-gray-800'
@@ -187,8 +205,8 @@ export default function AdminWhatsAppButton({ applicant, settings, onWaLogged }:
                                 <button
                                     type="button"
                                     disabled={!parentPhone}
-                                    onClick={() => setRecipientType('parent')}
-                                    className={`p-2.5 rounded-xl border text-left text-xs transition-all disabled:opacity-40 ${recipientType === 'parent' && parentPhone
+                                    onClick={() => handleSelectRecipient('parent')}
+                                    className={`p-2.5 rounded-xl border text-left text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed ${recipientType === 'parent' && parentPhone
                                             ? 'bg-emerald-600/15 border-emerald-500 font-extrabold'
                                             : isDarkMode
                                                 ? 'bg-gray-950/60 border-gray-800'
@@ -203,7 +221,39 @@ export default function AdminWhatsAppButton({ applicant, settings, onWaLogged }:
                                         {applicant.parent_phone || 'Tidak diisi'}
                                     </span>
                                 </button>
+
+                                <button
+                                    type="button"
+                                    disabled={!referrerPhone}
+                                    onClick={() => handleSelectRecipient('referrer')}
+                                    className={`p-2.5 rounded-xl border text-left text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed ${recipientType === 'referrer' && referrerPhone
+                                            ? 'bg-emerald-600/15 border-emerald-500 font-extrabold'
+                                            : isDarkMode
+                                                ? 'bg-gray-950/60 border-gray-800'
+                                                : 'bg-white border-[#d6c5b3]'
+                                        }`}
+                                >
+                                    <span className="flex items-center gap-1.5">
+                                        <Phone className="w-3.5 h-3.5 text-amber-600" />
+                                        <span>Guru / Wali Kelas Referal</span>
+                                    </span>
+                                    <span className="block font-mono mt-0.5 opacity-80">
+                                        {applicant.referrer_phone || 'Tanpa referal'}
+                                    </span>
+                                </button>
                             </div>
+                            {recipientType === 'referrer' && referrerPhone && (
+                                <div className="mt-2.5 p-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-xs">
+                                    <p className="font-bold">
+                                        Penerima Referal: {applicant.referrer_name || '-'} ({applicant.referral_code || '-'})
+                                    </p>
+                                    {(applicant.referrer_jabatan || applicant.referrer_school) && (
+                                        <p className="opacity-80">
+                                            {[applicant.referrer_jabatan, applicant.referrer_school].filter(Boolean).join(' • ')}
+                                        </p>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                         <div className="mb-4">
@@ -213,7 +263,10 @@ export default function AdminWhatsAppButton({ applicant, settings, onWaLogged }:
                                 </label>
                                 <button
                                     type="button"
-                                    onClick={() => setCustomMessage(buildWhatsAppMessage(applicant, settings))}
+                                    onClick={() => {
+                                        setHasManualEdit(false);
+                                        setCustomMessage(buildWhatsAppMessage(applicant, settings, undefined, recipientType));
+                                    }}
                                     className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline"
                                 >
                                     <RotateCcw className="w-3 h-3" />
@@ -223,7 +276,10 @@ export default function AdminWhatsAppButton({ applicant, settings, onWaLogged }:
                             <textarea
                                 rows={9}
                                 value={customMessage}
-                                onChange={(e) => setCustomMessage(e.target.value)}
+                                onChange={(e) => {
+                                    setHasManualEdit(true);
+                                    setCustomMessage(e.target.value);
+                                }}
                                 className={`w-full rounded-2xl border p-3.5 text-xs leading-relaxed outline-none ${isDarkMode
                                         ? 'bg-gray-950 border-gray-700 text-gray-100 focus:border-emerald-500'
                                         : 'bg-white border-[#cbb7a2] text-[#1f1410] focus:border-emerald-600'

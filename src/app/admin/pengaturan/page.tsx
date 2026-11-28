@@ -70,6 +70,7 @@ export default function PengaturanPage() {
         headmaster_nip: '',
         logo_url: '',
         virtual_background_url: '',
+        referral_auto_approve: false,
     });
 
     const [majorQuotas, setMajorQuotas] = useState<Record<string, number>>(DEFAULT_QUOTAS);
@@ -112,6 +113,7 @@ export default function PengaturanPage() {
                         headmaster_nip: s.headmaster_nip || '',
                         logo_url: s.logo_url || '',
                         virtual_background_url: s.virtual_background_url || '',
+                        referral_auto_approve: Boolean(s.referral_auto_approve),
                     });
 
                     if (s.major_quotas) {
@@ -269,6 +271,19 @@ export default function PengaturanPage() {
                             <div>
                                 <label className={`block text-xs sm:text-sm font-bold mb-1 ${labelCls}`}>Tahun Ajaran</label>
                                 <input type="text" name="academic_year" value={formData.academic_year} onChange={handleChange} placeholder="2027/2028" className={`w-full p-2.5 rounded-xl border text-sm font-medium ${inputCls}`} />
+                            </div>
+                            <div className="sm:col-span-2 flex items-center justify-between p-3.5 rounded-2xl border border-dashed border-emerald-500/40 bg-emerald-500/5">
+                                <div>
+                                    <p className={`text-xs sm:text-sm font-bold ${labelCls}`}>Aktivasi Otomatis Kode Referal Guru / Wali Kelas</p>
+                                    <p className="text-[11px] opacity-75">Jika aktif, kode referal baru langsung berstatus Aktif tanpa perlu persetujuan admin terlebih dahulu.</p>
+                                </div>
+                                <input
+                                    type="checkbox"
+                                    name="referral_auto_approve"
+                                    checked={Boolean(formData.referral_auto_approve)}
+                                    onChange={(e) => setFormData((prev) => ({ ...prev, referral_auto_approve: e.target.checked }))}
+                                    className="w-5 h-5 accent-emerald-600 cursor-pointer shrink-0 ml-3"
+                                />
                             </div>
                             <div className="sm:col-span-2">
                                 <label className={`block text-xs sm:text-sm font-bold mb-1 ${labelCls}`}>Alamat Lengkap</label>

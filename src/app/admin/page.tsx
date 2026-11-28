@@ -47,7 +47,8 @@ import {
     Trophy,
     History as HistoryIcon,
     Wallet,
-    TrendingUp
+    TrendingUp,
+    QrCode
 } from 'lucide-react';
 import AdminRankingPanel from '@/components/AdminRankingPanel';
 
@@ -162,6 +163,7 @@ export default function AdminDashboard() {
     const [majorFilter, setMajorFilter] = useState<string>('ALL');
     const [pathFilter, setPathFilter] = useState<string>('ALL');
     const [reregFilter, setReregFilter] = useState<string>('ALL');
+    const [referralFilter, setReferralFilter] = useState<'ALL' | 'WITH_REFERRAL' | 'WITHOUT_REFERRAL'>('ALL');
 
     // State Dropdown Menu Ekspor Excel
     const [exportMenuOpen, setExportMenuOpen] = useState<boolean>(false);
@@ -337,7 +339,10 @@ export default function AdminDashboard() {
                 (app.registration_number || '').toLowerCase().includes(q) ||
                 (app.nisn || '').includes(q) ||
                 (app.nik || '').includes(q) ||
-                (app.asal_sekolah || '').toLowerCase().includes(q);
+                (app.asal_sekolah || '').toLowerCase().includes(q) ||
+                ((app as any).referral_code || '').toLowerCase().includes(q) ||
+                ((app as any).referrer_name || '').toLowerCase().includes(q) ||
+                ((app as any).referrer_school || '').toLowerCase().includes(q);
 
             const matchesStatus =
                 statusFilter === 'ALL' ||
@@ -360,9 +365,14 @@ export default function AdminDashboard() {
                 (reregFilter === 'PERBAIKAN' && app.rereg_status === 'Perbaikan Daftar Ulang') ||
                 (reregFilter === 'BELUM' && app.status === 'Diterima' && !app.rereg_status);
 
-            return matchesSearch && matchesStatus && matchesMajor && matchesPath && matchesRereg;
+            const matchesReferral =
+                referralFilter === 'ALL' ||
+                (referralFilter === 'WITH_REFERRAL' && Boolean((app as any).referral_code)) ||
+                (referralFilter === 'WITHOUT_REFERRAL' && !(app as any).referral_code);
+
+            return matchesSearch && matchesStatus && matchesMajor && matchesPath && matchesRereg && matchesReferral;
         });
-    }, [applicants, searchQuery, statusFilter, majorFilter, pathFilter, reregFilter]);
+    }, [applicants, searchQuery, statusFilter, majorFilter, pathFilter, reregFilter, referralFilter]);
 
     // Logika Checkbox Multi-Select (Bulk Action)
     const filteredIds = useMemo(() => filteredApplicants.map((a) => a.id), [filteredApplicants]);
@@ -449,6 +459,11 @@ export default function AdminDashboard() {
             'Status Daftar Ulang': app.rereg_status || (app.status === 'Diterima' ? 'Belum Daftar Ulang' : '-'),
             'Skema Pembayaran': app.payment_scheme || '-',
             'Ukuran Seragam': app.uniform_size || '-',
+            'Kode Referal': (app as any).referral_code || '-',
+            'Nama Referal': (app as any).referrer_name || '-',
+            'Jabatan Referal': (app as any).referrer_jabatan || '-',
+            'Sekolah Referal': (app as any).referrer_school || '-',
+            'No. WA Referal': (app as any).referrer_phone || '-',
             'Tgl Daftar': new Date(app.created_at).toLocaleString('id-ID'),
         }));
         const worksheet = XLSX.utils.json_to_sheet(dataToExport);
@@ -970,6 +985,18 @@ export default function AdminDashboard() {
                         >
                             <TrendingUp className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                             <span className="hidden sm:inline">Statistik</span>
+                        </Link>
+
+                        <Link
+                            href="/admin/referal"
+                            className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs sm:text-[13px] font-bold border transition-all duration-200 shadow-sm active:scale-95 ${isDarkMode
+                                ? 'bg-teal-950/60 hover:bg-teal-900/70 border-teal-800/60 text-teal-300'
+                                : 'bg-teal-50 hover:bg-teal-100 border-teal-200 text-teal-900'
+                                }`}
+                            title="Kelola Kode Referal Guru & Wali Kelas"
+                        >
+                            <QrCode className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+                            <span className="hidden sm:inline">Referal</span>
                         </Link>
 
                         <Link
@@ -1513,6 +1540,7 @@ export default function AdminDashboard() {
                                             <th className="p-4">Nama &amp; Kontak</th>
                                             <th className="p-4">NISN &amp; Tgl Lahir</th>
                                             <th className="p-4">Pilihan Jurusan</th>
+                                            <th className="p-4">Referal</th>
                                             <th className="p-4">Berkas &amp; Daftar Ulang</th>
                                             <th className="p-4 pr-4 w-84">Status &amp; Tindakan</th>
                                         </tr>
@@ -1634,6 +1662,24 @@ export default function AdminDashboard() {
                                                                     </div>
                                                                 )}
                                                             </div>
+                                                        )}
+                                                    </td>
+
+                                                    <td className="p-4 text-xs">
+                                                        {(app as any).referral_code ? (
+                                                            <div className="space-y-0.5">
+                                                                <span className="inline-block px-2 py-0.5 rounded-md font-mono font-extrabold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                                                                    {(app as any).referral_code}
+                                                                </span>
+                                                                <div className="font-bold truncate max-w-[140px]">
+                                                                    {(app as any).referrer_name || '-'}
+                                                                </div>
+                                                                <div className="opacity-70 text-[11px] truncate max-w-[140px]">
+                                                                    {(app as any).referrer_school || ''}
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="opacity-50">-</span>
                                                         )}
                                                     </td>
 
